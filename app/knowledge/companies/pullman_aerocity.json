@@ -1,0 +1,116 @@
+{
+  "company_id": "pullman_aerocity",
+  "company_name": "Pullman New Delhi Aerocity",
+  "brand": "Accor",
+  "location": {
+    "address": "Asset No 02, GMR Hospitality District, IGI Airport, Aerocity, New Delhi, Delhi 110037, India",
+    "proximity": "Adjacent to IGI Airport (approximately 4-5 km from Terminal 3) and walking distance from Delhi Metro Aerocity station."
+  },
+  "system_instruction": "You are the AI Front Desk Concierge for Pullman New Delhi Aerocity. Assist guests with hotel information, check-in and check-out, dining, wellness facilities, and hotel policies. Keep responses concise (1-2 sentences), polite, and suitable for a voice call. Answer ONLY based on the approved hotel facts provided. If a requested detail, live room rate, or current availability is not in the facts, politely state that you do not have that live information and offer to connect the caller with the hotel front desk or reservations team. Do NOT invent prices, availability, or amenities.",
+  "greeting_message": "Hello! Thank you for calling Pullman New Delhi Aerocity. How may I assist you with your stay or visit today?",
+  "stt_prompt": "Pullman New Delhi Aerocity hotel front desk conversation: check-in, check-out, room reservations, dining restaurants Pluck, Honk, Cafe Pluck, Chidya Ghar Bar, swimming pool timings, airport transfers, and guest amenities.",
+  "facts": [
+    {
+      "id": "check_in_out",
+      "category": "reception",
+      "keywords": ["check in", "check-in", "check out", "check-out", "timing", "timings", "arrive", "arrival", "departure", "leave", "time"],
+      "fact": "Check-in time at Pullman New Delhi Aerocity is 3:00 PM (15:00) and check-out time is 12:00 PM (12:00). Early check-in or late check-out is subject to room availability upon request."
+    },
+    {
+      "id": "check_in_id_policy",
+      "category": "reception",
+      "keywords": ["id", "identity", "identification", "proof", "passport", "aadhaar", "license", "document", "documents", "mandatory", "pan", "pan card", "driving license", "voter id", "address proof", "verification"],
+      "fact": "All adult guests must present a valid government-issued photo ID with address at check-in (Passport, Aadhaar Card, Driving License, or Voter ID). PAN cards are not accepted as valid address proof."
+    },
+    {
+      "id": "dining_overview",
+      "category": "dining",
+      "keywords": ["restaurant", "restaurants", "dining", "food", "eat", "dinner", "lunch", "breakfast", "cuisine", "buffet"],
+      "fact": "Pullman New Delhi Aerocity features four distinct dining venues: Pluck (seasonal modern European and Indian cuisine), Honk (pan-Asian street food and dim sum), Café Pluck (24-hour delicatessen and coffee bar), and The Chidya Ghar Bar (curated artisanal cocktails and wines)."
+    },
+    {
+      "id": "restaurant_pluck",
+      "category": "dining",
+      "keywords": ["pluck", "european", "indian", "farm to table", "farm-to-table", "herb garden"],
+      "fact": "Pluck is the hotel's signature restaurant offering modern European and contemporary Indian cuisine with a farm-to-table philosophy and an in-house organic herb garden."
+    },
+    {
+      "id": "restaurant_honk",
+      "category": "dining",
+      "keywords": ["honk", "asian", "pan-asian", "pan asian", "sushi", "dim sum", "dimsum", "noodles", "chinese", "japanese", "thai"],
+      "fact": "Honk is a signature pan-Asian restaurant specializing in authentic Asian street food, dim sum, sushi, and regional dishes from China, Japan, Thailand, and Vietnam."
+    },
+    {
+      "id": "restaurant_cafe_pluck",
+      "category": "dining",
+      "keywords": ["cafe", "café", "coffee", "pastry", "bakery", "cake", "tea", "deli", "patisserie", "24 hour", "24 hours"],
+      "fact": "Café Pluck is a 24-hour casual delicatessen and bakery offering freshly brewed specialty coffee, artisanal pastries, and light European-inspired bites."
+    },
+    {
+      "id": "bar_chidya_ghar",
+      "category": "dining",
+      "keywords": ["bar", "drinks", "cocktails", "cocktail", "alcohol", "chidya ghar", "wine", "spirits", "lounge"],
+      "fact": "The Chidya Ghar Bar is a stylish contemporary bar serving handcrafted artisanal cocktails, premium spirits, and fine international wines."
+    },
+    {
+      "id": "wellness_spa_pool",
+      "category": "wellness",
+      "keywords": ["spa", "massage", "salon", "pool", "swimming", "swimming pool", "swimming-pool", "swim", "wellness", "woo", "heated pool", "jacuzzi"],
+      "fact": "The hotel offers the luxurious Woo Wellness Spa & Salon for holistic therapies and treatments, as well as a heated outdoor swimming pool for relaxation."
+    },
+    {
+      "id": "fitness_gym",
+      "category": "wellness",
+      "keywords": ["gym", "fitness", "workout", "work out", "working out", "exercise", "fit lounge", "training", "cardio", "fitness center", "24/7", "24 hours", "24-hour", "gym hours", "gym timings", "workout facility"],
+      "fact": "The Fit Lounge is a 24/7 fitness center fully equipped with modern cardiovascular and strength-training machines."
+    },
+    {
+      "id": "wifi_internet",
+      "category": "amenities",
+      "keywords": ["wifi", "wi-fi", "internet", "wireless", "broadband", "network", "connect"],
+      "fact": "High-speed Wi-Fi internet access is complimentary for all registered in-house guests throughout the guest rooms and public areas."
+    },
+    {
+      "id": "airport_transport",
+      "category": "transport",
+      "keywords": ["airport", "shuttle", "transfer", "cab", "taxi", "car", "distance", "terminal 3", "t3", "igi", "aerocity", "pick up", "airport drop", "location", "address", "directions", "reach", "get there", "metro", "metro station", "subway", "train", "walking distance"],
+      "fact": "Pullman New Delhi Aerocity is located approximately 4 to 5 kilometers from Indira Gandhi International Airport Terminal 3 and is within walking distance from the Delhi Metro Aerocity station. Airport transfers and private car services can be arranged on request through the concierge desk."
+    },
+    {
+      "id": "concierge_luggage_service",
+      "category": "amenities",
+      "keywords": ["luggage", "baggage", "bags", "store", "storage", "concierge", "leave bags", "hold luggage", "drop bags", "cloakroom", "store bags", "suitcases", "suitcase", "drop suitcases", "drop my suitcases", "drop my bags", "leave luggage", "store suitcases", "rucksack", "rucksacks", "backpack", "backpacks", "belongings"],
+      "fact": "Complimentary luggage storage and concierge assistance are available for hotel guests at the front desk before check-in and after check-out."
+    },
+    {
+      "id": "accessibility_facilities",
+      "category": "amenities",
+      "keywords": ["wheelchair", "accessible", "accessibility", "handicap", "disabled", "barrier free", "mobility"],
+      "fact": "Pullman New Delhi Aerocity provides wheelchair accessibility throughout the property, including accessible entrances, elevators, and specially equipped guest rooms."
+    },
+    {
+      "id": "parking_facilities",
+      "category": "transport",
+      "keywords": ["parking", "valet", "car park", "park car", "vehicle", "self parking"],
+      "fact": "On-site valet parking and dedicated parking facilities are available for registered hotel guests and restaurant visitors."
+    },
+    {
+      "id": "pet_policy",
+      "category": "policies",
+      "keywords": ["pet", "pets", "dog", "dogs", "cat", "cats", "animal", "animals", "service animal"],
+      "fact": "Service animals are permitted at the hotel. Guests traveling with other pets must seek prior confirmation and approval directly from hotel management before arrival."
+    },
+    {
+      "id": "smoking_policy",
+      "category": "policies",
+      "keywords": ["smoking", "smoke", "cigarette", "tobacco", "non-smoking", "vape"],
+      "fact": "All guest rooms and indoor public spaces at Pullman New Delhi Aerocity are 100% non-smoking. Designated outdoor smoking zones are provided on the property."
+    },
+    {
+      "id": "live_rates_and_availability",
+      "category": "reservations",
+      "keywords": ["price", "prices", "cost", "rate", "rates", "tariff", "availability", "available", "vacant", "vacancy", "book", "booking", "reserve", "reservation", "room price", "how much"],
+      "fact": "Room rates and availability vary in real time based on stay dates, room type, and occupancy. Please contact hotel reservations or visit the official Accor website for live pricing and booking confirmation."
+    }
+  ]
+}

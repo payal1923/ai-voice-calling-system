@@ -1,0 +1,3207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AI Voice Calling Operations Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-subtle: #f1f5f9;
+            --border: #e2e8f0;
+            --border-focus: #cbd5e1;
+            
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --text-subtle: #94a3b8;
+            
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eef2ff;
+            --primary-border: #c7d2fe;
+            
+            --accent-purple: #7c3aed;
+            --accent-purple-light: #f5f3ff;
+            
+            --success: #059669;
+            --success-light: #ecfdf5;
+            --success-border: #a7f3d0;
+            
+            --warning: #d97706;
+            --warning-light: #fffbeb;
+            --warning-border: #fde68a;
+            
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --danger-light: #fef2f2;
+            --danger-border: #fecaca;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        .hidden { display: none !important; }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .badge-primary { background: var(--primary-light); color: var(--primary); border: 1px solid var(--primary-border); }
+        .badge-success { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+        .badge-warning { background: var(--warning-light); color: var(--warning); border: 1px solid var(--warning-border); }
+        .badge-danger { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger-border); }
+        .badge-gray { background: var(--bg-subtle); color: var(--text-muted); border: 1px solid var(--border); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.55rem 1.1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background-color: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 1px 2px rgba(79, 70, 229, 0.2);
+        }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-secondary {
+            background-color: #ffffff;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+        .btn-secondary:hover {
+            background-color: var(--bg-subtle);
+            border-color: var(--border-focus);
+        }
+        .btn-danger {
+            background-color: var(--danger);
+            color: #ffffff;
+        }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+        .btn-outline-danger {
+            background: #ffffff;
+            color: var(--danger);
+            border: 1px solid var(--danger-border);
+        }
+        .btn-outline-danger:hover { background: var(--danger-light); }
+        .btn-sm {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        .btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed !important;
+        }
+
+        /* HEADER / NAVBAR */
+        .navbar {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: var(--shadow-sm);
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+        }
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.25rem;
+            font-weight: 800;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+        }
+        .brand-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+        .brand-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .nav-items {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.5rem 0.85rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .nav-btn:hover {
+            color: var(--text-main);
+            background-color: var(--bg-subtle);
+        }
+        .nav-btn.active {
+            color: var(--primary);
+            background-color: var(--primary-light);
+            font-weight: 700;
+        }
+        .user-nav-box {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-left: 1rem;
+            padding-left: 1rem;
+            border-left: 1px solid var(--border);
+        }
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.825rem;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        /* MAIN CONTAINER */
+        .main-container {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .card-desc {
+            font-size: 0.825rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: var(--bg-subtle);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-size: 0.725rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .data-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .data-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-muted);
+        }
+        .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-subtle);
+        }
+        .empty-title {
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.25rem;
+            font-size: 1rem;
+        }
+        .empty-text {
+            font-size: 0.85rem;
+            max-width: 400px;
+            margin: 0 auto 1.25rem auto;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.35rem;
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.6rem 0.85rem;
+            font-size: 0.875rem;
+            font-family: inherit;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background-color: #ffffff;
+            color: var(--text-main);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+            animation: modalFadeIn 0.15s ease;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-dialog {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+        }
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-body {
+            padding: 1.5rem;
+        }
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            background-color: var(--bg-subtle);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            border-bottom-left-radius: var(--radius-lg);
+            border-bottom-right-radius: var(--radius-lg);
+        }
+
+        .login-wrapper {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 420px;
+            padding: 2.25rem;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 1.75rem;
+        }
+
+        .transcript-container {
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            max-height: 380px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .chat-bubble {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            line-height: 1.45;
+        }
+        .chat-customer {
+            align-self: flex-start;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-bottom-left-radius: 4px;
+        }
+        .chat-assistant {
+            align-self: flex-end;
+            background: var(--primary);
+            color: #ffffff;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-speaker {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 0.25rem;
+            opacity: 0.85;
+        }
+
+        .audio-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        .mic-panel {
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            text-align: center;
+        }
+        .mic-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.825rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+        .pulse-dot {
+            width: 10px; height: 10px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            animation: pulse-red 1.2s infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(1.2); }
+        }
+
+        .waiting-audio-box {
+            background: var(--warning-light);
+            border: 1px solid var(--warning-border);
+            color: var(--warning);
+            border-radius: var(--radius-sm);
+            padding: 0.6rem 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .lang-choice-card {
+            background: var(--primary-light);
+            border: 1px solid var(--primary-border);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .lang-btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+        .stat-val {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        /* Human Assistance Callback Styles */
+        .badge-info {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+        .badge-amber {
+            background: #fffbeb;
+            color: #b45309;
+            border: 1px solid #fde68a;
+        }
+        .btn-call-back {
+            background-color: #4338ca;
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 1px 3px rgba(67, 56, 202, 0.25);
+        }
+        .btn-call-back:hover {
+            background-color: #3730a3;
+            box-shadow: 0 2px 6px rgba(67, 56, 202, 0.35);
+        }
+        .btn-complete-cb {
+            background-color: #059669;
+            color: #ffffff;
+            font-weight: 600;
+        }
+        .btn-complete-cb:hover {
+            background-color: #047857;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 0.4rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-pill {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.35rem 0.8rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .filter-pill:hover {
+            background: var(--bg-subtle);
+            color: var(--text-main);
+            border-color: var(--border-focus);
+        }
+        .filter-pill.active {
+            background: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary);
+        }
+
+        .toast-box {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 0.9rem 1.25rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 9999;
+            max-width: 420px;
+            animation: slide-up 0.25s ease-out;
+        }
+        /* Integrated Live Voice Visualizer Styles */
+        .live-orb-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem 0 1rem;
+        }
+        .live-voice-orb {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            box-shadow: 0 0 25px rgba(79, 70, 229, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            position: relative;
+        }
+        .live-voice-orb.listening {
+            background: linear-gradient(135deg, #10b981, #06b6d4);
+            box-shadow: 0 0 35px rgba(16, 185, 129, 0.5);
+            animation: orb-breathing 2s infinite ease-in-out;
+        }
+        .live-voice-orb.speaking {
+            background: linear-gradient(135deg, #06b6d4, #818cf8);
+            box-shadow: 0 0 40px rgba(6, 182, 212, 0.6);
+            animation: orb-bounce 1.2s infinite ease-in-out;
+        }
+        .live-voice-orb.thinking {
+            background: linear-gradient(135deg, #f59e0b, #ec4899);
+            box-shadow: 0 0 35px rgba(245, 158, 11, 0.5);
+            animation: orb-rotate 2.5s infinite linear;
+        }
+        .live-voice-orb.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            box-shadow: 0 0 35px rgba(239, 68, 68, 0.6);
+            animation: orb-bounce 1s infinite ease-in-out;
+        }
+        @keyframes orb-breathing {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        @keyframes orb-bounce {
+            0%, 100% { transform: scale(1.05); }
+            50% { transform: scale(0.96); }
+        }
+        @keyframes orb-rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .live-waveform-bars {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 24px;
+            margin-top: 10px;
+        }
+        .live-bar {
+            width: 4px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 9999px;
+            transition: height 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP NAVBAR -->
+    <header class="navbar">
+        <div class="brand" onclick="navigate('customers')">
+            <div class="brand-icon">📞</div>
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="brand-title">Voice Operations Hub</div>
+                    <span id="nav-company-pill" class="badge badge-primary hidden" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; text-transform: capitalize;"></span>
+                </div>
+                <div class="brand-subtitle">Call Management & Voice Operations</div>
+            </div>
+        </div>
+
+        <nav class="nav-items" id="authenticated-nav">
+            <button class="nav-btn active" id="tab-customers" onclick="navigate('customers')">👥 Customers</button>
+            <button class="nav-btn" id="tab-history" onclick="navigate('history')">📜 Call History</button>
+            <button class="nav-btn" id="tab-live-call" onclick="navigate('live-call')">🎙️ Live Call</button>
+            <button class="nav-btn" id="tab-automation" onclick="navigate('automation')">🚀 Automated Calling</button>
+            <button class="nav-btn" id="tab-escalations" onclick="navigate('escalations')">
+                <span>🆘 Human Assistance</span>
+                <span class="badge badge-danger" id="nav-escalation-count">0</span>
+            </button>
+            
+            <div class="user-nav-box">
+                <div class="user-pill">
+                    <span id="nav-username">👤 Admin</span>
+                    <span class="badge badge-primary hidden" id="nav-role">admin</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="main-container">
+
+        <!-- ========================================== -->
+        <!-- VIEW: LOGIN (REQUIRED SECTION 1)           -->
+        <!-- ========================================== -->
+        <section id="view-login" class="login-wrapper">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="brand-icon" style="margin: 0 auto 1rem auto; width: 48px; height: 48px;">🔐</div>
+                    <h1 style="font-size: 1.35rem; font-weight: 800; color: var(--text-main);">System User Sign In</h1>
+                    <p style="font-size: 0.825rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        Authentication required for call operations dashboard
+                    </p>
+                </div>
+
+                <form id="login-form">
+                    <div class="form-group">
+                        <label class="form-label" for="login-username">Username</label>
+                        <input type="text" id="login-username" class="form-control" placeholder="e.g. admin" required autofocus>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-password">Password</label>
+                        <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+                    </div>
+
+                    <div id="login-error" class="badge badge-danger hidden" style="width: 100%; padding: 0.6rem; margin-bottom: 1rem; justify-content: center;">
+                        Invalid credentials.
+                    </div>
+
+                    <button type="submit" id="login-btn" class="btn btn-primary" style="width: 100%;">
+                        Sign In →
+                    </button>
+                </form>
+
+                <div style="margin-top: 1.25rem; text-align: center; font-size: 0.75rem; color: var(--text-muted);">
+                    Customers do not require accounts or logins.
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION A: CUSTOMERS                       -->
+        <!-- ========================================== -->
+        <section id="view-customers" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">👥 Customers</h2>
+                        <p class="card-desc">Customer records and contact details.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" id="customer-search-input" class="form-control" placeholder="Search name, phone, ID..." style="width: 240px;" oninput="debounceSearch()">
+                        <button class="btn btn-primary btn-sm" onclick="openAddCustomerModal()">+ Add Customer</button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadCustomers()">↻ Refresh</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Customer ID</th>
+                                <th>Name</th>
+                                <th>Phone Number</th>
+                                <th>Created</th>
+                                <th>Total Calls</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="customers-empty" class="empty-state hidden">
+                    <div class="empty-icon">👥</div>
+                    <div class="empty-title">No customers found</div>
+                    <div class="empty-text">No customer records match your search.</div>
+                    <button class="btn btn-primary btn-sm" onclick="openAddCustomerModal()">+ Add New Customer</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION B: CALL HISTORY                    -->
+        <!-- ========================================== -->
+        <section id="view-history" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">📜 Call History</h2>
+                        <p class="card-desc">Chronological log of completed calls and conversation transcripts.</p>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="loadCallHistory()">↻ Refresh</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Call ID</th>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Language</th>
+                                <th>Status</th>
+                                <th>Started</th>
+                                <th>Duration</th>
+                                <th>Messages</th>
+                                <th>Requirements</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calls-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="calls-empty" class="empty-state hidden">
+                    <div class="empty-icon">📜</div>
+                    <div class="empty-title">No call records found</div>
+                    <div class="empty-text">Call history will appear here once calls are initiated.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION C: LIVE CALL (PRIMARY WORKFLOW)    -->
+        <!-- ========================================== -->
+        <section id="view-live-call" class="hidden">
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <h2 class="card-title">🎙️ Live AI Voice Conversation</h2>
+                        <p class="card-desc">Natural hands-free voice conversation with local AI (Faster-Whisper → Ollama → Piper).</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="navigate('history')">
+                            📜 Call History
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="navigate('customers')">
+                            👥 Customers Dashboard
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pre-Call Setup & Start Panel -->
+                <div id="live-pre-call-card" style="padding: 2.25rem 1rem;">
+                    <div style="max-width: 520px; margin: 0 auto; text-align: center;">
+                        <div style="width: 72px; height: 72px; background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin: 0 auto 1.25rem; border: 2px solid var(--primary-border); box-shadow: var(--shadow-sm);">
+                            🎙️
+                        </div>
+                        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
+                            Natural Hands-Free AI Voice Calling
+                        </h3>
+                        <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.55;">
+                            Talk naturally in real time with your AI assistant using your browser microphone. Incoming speech is transcribed and answered instantly with natural voice.
+                        </p>
+
+                        <div class="form-group" style="text-align: left; margin-bottom: 1.5rem;">
+                            <label class="form-label" style="font-weight: 600; color: var(--text-main);">Customer Profile (Optional):</label>
+                            <select id="live-customer-dropdown" class="form-control" style="width: 100%; height: 42px; font-size: 0.9rem; background: #ffffff;">
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
+
+                        <button type="button" id="btn-sip-call" class="btn btn-primary" style="width: 100%; padding: 0.85rem 1.5rem; font-size: 1.05rem; font-weight: 700; border-radius: var(--radius-sm); box-shadow: var(--shadow);" onclick="startLiveVoiceCall()">
+                            📞 Start Conversation
+                        </button>
+
+                        <div style="margin-top: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <span id="sip-reg-status" class="badge badge-gray hidden" style="font-size: 0.75rem;">WS: DISCONNECTED</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Call Session Panel -->
+                <div id="live-call-active-panel" class="hidden">
+                    <!-- Live Call Header / Status Bar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-sm); margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <strong id="live-active-cust-name" style="font-size: 1.05rem; color: var(--primary);">Customer Name</strong>
+                                <span id="webrtc-call-status-pill" class="badge badge-success">ACTIVE CALL</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;" id="live-active-cust-meta">
+                                Call #0 • Real-time Hands-Free Session
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span id="live-mic-indicator" class="badge badge-success" style="font-size: 0.85rem; padding: 0.4rem 0.85rem; font-weight: 600;">🎙️ Listening</span>
+                            <button type="button" id="btn-sip-hangup" class="btn btn-danger" style="font-weight: 700;" onclick="endLiveVoiceCall()">
+                                ⏹ End Conversation
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Reactive Voice Orb & Waveform Visualizer -->
+                    <div class="live-orb-container" id="live-orb-stage">
+                        <div class="live-voice-orb listening" id="live-voice-orb" onclick="interruptLiveVoiceCall()" title="Click to interrupt AI speech anytime">
+                            <span id="live-orb-emoji">🎙️</span>
+                        </div>
+                        <div style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-top: 8px;" id="live-orb-status-text">
+                            Listening
+                        </div>
+                        <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;" id="live-state-description">
+                            Microphone is listening. Speak naturally...
+                        </div>
+                        <div class="live-waveform-bars" id="live-waveform-bars">
+                            <div class="live-bar" style="height: 6px;"></div>
+                            <div class="live-bar" style="height: 10px;"></div>
+                            <div class="live-bar" style="height: 16px;"></div>
+                            <div class="live-bar" style="height: 22px;"></div>
+                            <div class="live-bar" style="height: 16px;"></div>
+                            <div class="live-bar" style="height: 10px;"></div>
+                            <div class="live-bar" style="height: 6px;"></div>
+                            <div class="live-bar" style="height: 4px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Conversation Transcript -->
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label class="form-label" style="margin-bottom: 0; font-weight: 600;">Conversation Transcript</label>
+                            <span id="live-transcript-count" class="badge badge-gray">0 messages</span>
+                        </div>
+                        <div id="live-transcript-box" class="transcript-container" style="min-height: 280px; max-height: 440px; overflow-y: auto; background: var(--bg-subtle);">
+                            <div style="text-align: center; color: var(--text-subtle); margin: auto; font-size: 0.85rem;">
+                                Call in progress. Speak naturally through your microphone...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Call Controls -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 0.75rem 1rem; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <button type="button" id="btn-live-interrupt" class="btn btn-warning btn-sm" onclick="interruptLiveVoiceCall()" title="Interrupt assistant and stop speech">
+                                🛑 Interrupt AI
+                            </button>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">
+                            Hands-free voice conversation. Speak naturally when Listening.
+                        </div>
+                    </div>
+
+                    <!-- Hidden Remote Audio Element -->
+                    <audio id="webrtc-remote-audio" autoplay class="hidden"></audio>
+
+                    <!-- Collapsible Diagnostic Activity Log -->
+                    <details style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+                        <summary style="cursor: pointer; font-weight: 600; user-select: none;">Diagnostic Activity Log</summary>
+                        <div id="sip-log-box" style="margin-top: 0.5rem; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.85rem; font-family: monospace; font-size: 0.78rem; color: var(--text-main); max-height: 120px; overflow-y: auto;">
+                            <div style="color: var(--text-muted);">[System] In-app voice session ready.</div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION D: AUTOMATED CALLING               -->
+        <!-- ========================================== -->
+        <section id="view-automation" class="hidden">
+            <!-- Simulation Mode Honest Disclaimer -->
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.25rem;">ℹ️</span>
+                <div style="font-size: 0.825rem; color: #1e40af;">
+                    <strong>Simulation Mode Active:</strong> Automated calling runs in local simulation mode for testing. No carrier telephone calls are placed.
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-val" id="stat-auto-status">Stopped</div>
+                    <div class="stat-label">Automation Engine</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="stat-auto-waiting">0</div>
+                    <div class="stat-label">Queue Waiting</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="stat-auto-completed">0</div>
+                    <div class="stat-label">Calls Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="stat-auto-failed">0</div>
+                    <div class="stat-label">Calls Failed / Cancelled</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">🚀 Automated Queue Controls</h2>
+                        <p class="card-desc">Schedule and run automated AI voice calls across your customer queue.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button id="btn-start-auto" class="btn btn-primary" onclick="startAutomatedCalling()">
+                            ▶ START AUTOMATED CALLING
+                        </button>
+                        <button id="btn-stop-auto" class="btn btn-danger hidden" onclick="stopAutomatedCalling()">
+                            ⏹ STOP AUTOMATED CALLING
+                        </button>
+                        <button id="btn-stop-current-call" class="btn btn-outline-danger btn-sm hidden" onclick="stopActiveCall()">
+                            Cancel Active Call
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Customer Selection for Queue -->
+                <div style="margin-bottom: 1.25rem; padding: 1rem; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span style="font-size: 0.85rem; font-weight: 700;">Select Customers:</span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary btn-sm" onclick="toggleSelectAllCustomers(true)">Select All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="toggleSelectAllCustomers(false)">Deselect All</button>
+                        </div>
+                    </div>
+                    <div id="auto-customer-select-list" style="max-height: 180px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.5rem;">
+                        <!-- Checkboxes inserted dynamically -->
+                    </div>
+                </div>
+
+                <!-- Queue Status Display -->
+                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem;">Real-time Queue Status:</h3>
+                <div id="auto-queue-display" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-sm);">
+                        Queue is idle. Select customers and click "START AUTOMATED CALLING" to begin.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION E: HUMAN ASSISTANCE                -->
+        <!-- ========================================== -->
+        <section id="view-escalations" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">🆘 Human Assistance & Callbacks</h2>
+                        <p class="card-desc">Customer assistance queue for Hindi/Marathi routing and representative callbacks.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                        <div class="filter-group">
+                            <button class="filter-pill active" id="esc-pill-all" onclick="filterEscalations('all')">All</button>
+                            <button class="filter-pill" id="esc-pill-waiting" onclick="filterEscalations('waiting')">Waiting for Callback</button>
+                            <button class="filter-pill" id="esc-pill-initiated" onclick="filterEscalations('callback_initiated')">Callback Initiated</button>
+                            <button class="filter-pill" id="esc-pill-resolved" onclick="filterEscalations('resolved')">Resolved</button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="loadEscalations()">↻ Refresh</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Customer Name</th>
+                                <th>Phone Number</th>
+                                <th>Selected Language</th>
+                                <th>Reason</th>
+                                <th>Callback Status</th>
+                                <th>Request Time</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="escalations-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="escalations-empty" class="empty-state hidden" style="padding: 1.5rem 1rem;">
+                    <div class="empty-icon" style="font-size: 2rem; margin-bottom: 0.5rem;">✅</div>
+                    <div class="empty-title">All clear! No pending assistance requests</div>
+                    <div class="empty-text" style="margin-bottom: 0;">When a customer needs human assistance or selects Hindi/Marathi, requests appear here immediately with one-click callback.</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================================================== -->
+    <!-- MODAL: CALL DETAILS & FULL TRANSCRIPT (SECTION B)   -->
+    <!-- ==================================================== -->
+    <div id="modal-call-details" class="modal-overlay hidden">
+        <div class="modal-dialog" style="max-width: 650px;">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">Call Details</h3>
+                    <div style="font-size: 0.775rem; color: var(--text-muted);" id="modal-detail-call-id">Call ID: #0</div>
+                </div>
+                <button class="modal-close" onclick="closeCallDetailsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Customer & Call Information -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; font-size: 0.825rem; background: var(--bg-subtle); padding: 0.85rem; border-radius: var(--radius-sm);">
+                    <div><strong>Customer Name:</strong> <span id="detail-cust-name">-</span></div>
+                    <div><strong>Customer Phone:</strong> <span id="detail-cust-phone">-</span></div>
+                    <div><strong>Call Status:</strong> <span id="detail-call-status" class="badge badge-gray">-</span></div>
+                    <div><strong>Selected Language:</strong> <span id="detail-call-lang">English</span></div>
+                    <div><strong>Start Time:</strong> <span id="detail-call-started">-</span></div>
+                    <div><strong>End Time:</strong> <span id="detail-call-ended">-</span></div>
+                </div>
+
+                <!-- Structured Requirements Collected -->
+                <div style="margin-bottom: 1.25rem;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 0.4rem;">
+                        📋 Requirements Collected During Conversation:
+                    </h4>
+                    <div id="detail-requirements-box" style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; font-size: 0.825rem;">
+                        No structured requirements collected for this call.
+                    </div>
+                </div>
+
+                <!-- Complete Conversation Transcript -->
+                <div>
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem;">
+                        💬 Complete Conversation Transcript:
+                    </h4>
+                    <div id="detail-transcript-box" class="transcript-container">
+                        <!-- Populated chronologically -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeCallDetailsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL: ADD / EDIT CUSTOMER                          -->
+    <!-- ==================================================== -->
+    <div id="modal-customer" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title" id="cust-modal-title">Add Customer</h3>
+                <button class="modal-close" onclick="closeCustomerModal()">&times;</button>
+            </div>
+            <form id="customer-form">
+                <div class="modal-body">
+                    <input type="hidden" id="cust-form-id">
+                    <div class="form-group">
+                        <label class="form-label" for="cust-form-ext-id">Customer ID *</label>
+                        <input type="text" id="cust-form-ext-id" class="form-control" placeholder="Customer ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="cust-form-name">Customer Full Name *</label>
+                        <input type="text" id="cust-form-name" class="form-control" placeholder="Customer full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="cust-form-phone">Phone Number *</label>
+                        <input type="text" id="cust-form-phone" class="form-control" placeholder="Phone number" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeCustomerModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="cust-form-submit">Save Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL: RESOLVE ESCALATION                           -->
+    <!-- ==================================================== -->
+    <div id="modal-resolve-esc" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Resolve Escalation</h3>
+                <button class="modal-close" onclick="closeResolveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="resolve-esc-id">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                    Record resolution notes for customer <strong id="resolve-cust-name"></strong>:
+                </p>
+                <div class="form-group">
+                    <label class="form-label">Resolution Notes</label>
+                    <textarea id="resolve-notes" class="form-control" rows="3" placeholder="Handled customer query regarding..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeResolveModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitResolveEscalation()">Mark Resolved</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL: INITIATE CUSTOMER CALLBACK (REQUIREMENT 1)    -->
+    <!-- ==================================================== -->
+    <div id="modal-callback-confirm" class="modal-overlay hidden">
+        <div class="modal-dialog" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title">📞 Initiate Customer Callback</h3>
+                <button class="modal-close" onclick="closeCallbackModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cb-modal-esc-id">
+                <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 1rem;">
+                    <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);" id="cb-modal-cust-name">-</div>
+                    <div style="font-size: 0.825rem; color: var(--text-muted); margin-top: 0.2rem;">
+                        Phone: <strong id="cb-modal-cust-phone" style="color: var(--text-main);">-</strong>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--primary); margin-top: 0.2rem;">
+                        Language: <strong id="cb-modal-cust-lang">Hindi</strong>
+                    </div>
+                </div>
+
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #1e40af;">
+                    <strong>ℹ️ Telephony Notice:</strong> Callback action will be registered in customer records with timestamp. Telephony provider gateway is currently integration-ready (carrier PBX connection pending).
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cb-modal-notes">Operator Callback Notes (Optional)</label>
+                    <textarea id="cb-modal-notes" class="form-control" rows="2" placeholder="e.g. Assigned operator for phone outreach..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCallbackModal()">Cancel</button>
+                <button type="button" class="btn btn-call-back" onclick="confirmInitiateCallback()">Initiate Callback →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="hidden"></div>
+
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        // Centralized FastAPI Backend Base URL resolution
+        function determineApiBase() {
+            if (window.location.port === '5500') {
+                const hostname = window.location.hostname || 'localhost';
+                return `http://${hostname}:8000`;
+            }
+            if (window.location.origin && window.location.origin.startsWith('http')) {
+                return window.location.origin;
+            }
+            return 'http://localhost:8000';
+        }
+        const API_BASE = determineApiBase();
+
+        function resolveAudioUrl(url) {
+            if (!url) return '';
+            if (url.startsWith('http://') || url.startsWith('https://')) return url;
+            return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+        }
+
+        let authToken = localStorage.getItem('auth_token') || null;
+        let currentUser = null;
+        let allCustomers = [];
+        let autoPollingInterval = null;
+        let searchTimeout = null;
+
+        function authHeaders() {
+            return { 'Authorization': `Bearer ${authToken}` };
+        }
+
+        function updateUserNav(user) {
+            if (!user) return;
+            const usernameEl = document.getElementById('nav-username');
+            const roleEl = document.getElementById('nav-role');
+            const u = (user.username || '').trim();
+            const r = (user.role || '').trim();
+
+            if (usernameEl) {
+                usernameEl.textContent = `👤 ${u}`;
+            }
+            if (roleEl) {
+                if (r && r.toLowerCase() !== u.toLowerCase()) {
+                    roleEl.textContent = r;
+                    roleEl.classList.remove('hidden');
+                } else {
+                    roleEl.classList.add('hidden');
+                }
+            }
+        }
+
+        function updateCompanyBadge() {
+            const params = new URLSearchParams(window.location.search);
+            const companyId = (params.get('company_id') || '').trim();
+            const pill = document.getElementById('nav-company-pill');
+            if (!pill) return;
+            if (companyId) {
+                const formatted = companyId
+                    .split('_')
+                    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(' ');
+                pill.textContent = `🏢 ${formatted}`;
+                pill.classList.remove('hidden');
+            } else {
+                pill.classList.add('hidden');
+            }
+        }
+
+        async function ensureAuth() {
+            // 1. If we have an existing authToken, verify it with /api/auth/me
+            if (authToken) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+                    if (res.ok) {
+                        currentUser = await res.json();
+                        updateUserNav(currentUser);
+                        return true;
+                    }
+                } catch (e) {
+                    console.warn('[AUTH] Existing token validation failed:', e);
+                }
+            }
+
+            // 2. Automatically authenticate with seeded operator credentials for seamless dashboard access
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'AdminPass123!' })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    authToken = data.access_token;
+                    localStorage.setItem('auth_token', authToken);
+                    currentUser = data.user;
+                    updateUserNav(currentUser);
+                    return true;
+                }
+            } catch (e) {
+                console.warn('[AUTH] Auto operator login attempt failed:', e);
+            }
+            return false;
+        }
+
+        async function checkAuth() {
+            updateCompanyBadge();
+
+            // Determine requested view from URL hash or query parameters
+            const rawHash = (window.location.hash || '').replace('#', '').trim();
+            const validViews = ['customers', 'history', 'live-call', 'automation', 'escalations'];
+            let requestedView = 'customers';
+
+            if (validViews.includes(rawHash)) {
+                requestedView = rawHash;
+            } else if (window.location.search.includes('view=live-call') || window.location.pathname === '/call') {
+                requestedView = 'live-call';
+            }
+
+            // Ensure navigation bar is visible so sections are never inaccessible
+            const authNav = document.getElementById('authenticated-nav');
+            if (authNav) authNav.classList.remove('hidden');
+
+            const isAuthed = await ensureAuth();
+
+            if (isAuthed || requestedView === 'live-call') {
+                const loginView = document.getElementById('view-login');
+                if (loginView) loginView.classList.add('hidden');
+                navigate(requestedView);
+            } else {
+                showLogin();
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('authenticated-nav').classList.add('hidden');
+            document.getElementById('view-login').classList.remove('hidden');
+            ['customers', 'history', 'live-call', 'automation', 'escalations'].forEach(v => {
+                const sec = document.getElementById(`view-${v}`);
+                if (sec) sec.classList.add('hidden');
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('auth_token');
+            authToken = null;
+            currentUser = null;
+            clearInterval(autoPollingInterval);
+            showLogin();
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('login-username').value.trim();
+            const p = document.getElementById('login-password').value;
+            const errDiv = document.getElementById('login-error');
+            const btn = document.getElementById('login-btn');
+
+            errDiv.classList.add('hidden');
+            btn.disabled = true;
+            btn.textContent = 'Authenticating...';
+
+            const loginUrl = `${API_BASE}/api/auth/login`;
+            console.log(`[AUTH] Dispatching login request to: ${loginUrl}`);
+
+            try {
+                const res = await fetch(loginUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+                authToken = data.access_token;
+                localStorage.setItem('auth_token', authToken);
+                currentUser = data.user;
+
+                updateUserNav(currentUser);
+                document.getElementById('authenticated-nav').classList.remove('hidden');
+                document.getElementById('view-login').classList.add('hidden');
+
+                const rawHash = (window.location.hash || '').replace('#', '').trim();
+                const validViews = ['customers', 'history', 'live-call', 'automation', 'escalations'];
+                const targetView = validViews.includes(rawHash) ? rawHash : 'customers';
+                navigate(targetView);
+            } catch (err) {
+                errDiv.textContent = err.message;
+                errDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In →';
+            }
+        });
+
+        function navigate(viewName) {
+            const validViews = ['customers', 'history', 'live-call', 'automation', 'escalations'];
+            if (!validViews.includes(viewName)) viewName = 'customers';
+
+            // 1. Toggle visibility of view sections and active state of navbar buttons
+            validViews.forEach(v => {
+                const sec = document.getElementById(`view-${v}`);
+                const btn = document.getElementById(`tab-${v}`);
+                if (sec) sec.classList.toggle('hidden', v !== viewName);
+                if (btn) btn.classList.toggle('active', v === viewName);
+            });
+
+            // 2. Hide login screen and keep navigation bar visible
+            const loginView = document.getElementById('view-login');
+            if (loginView) loginView.classList.add('hidden');
+            const authNav = document.getElementById('authenticated-nav');
+            if (authNav) authNav.classList.remove('hidden');
+
+            // 3. Keep URL query params intact (e.g. company_id) and synchronize hash
+            const currentSearch = window.location.search || '';
+            if (window.location.hash !== `#${viewName}`) {
+                history.replaceState(null, '', `${currentSearch}#${viewName}`);
+            }
+
+            // 4. Trigger data loading for the selected view
+            if (viewName === 'customers') loadCustomers();
+            if (viewName === 'history') loadCallHistory();
+            if (viewName === 'live-call') {
+                populateLiveCallDropdown();
+                const preCallCard = document.getElementById('live-pre-call-card');
+                const activePanel = document.getElementById('live-call-active-panel');
+                if (preCallCard && activePanel) {
+                    if (isLiveCallActive) {
+                        preCallCard.classList.add('hidden');
+                        activePanel.classList.remove('hidden');
+                    } else {
+                        preCallCard.classList.remove('hidden');
+                        activePanel.classList.add('hidden');
+                    }
+                }
+            }
+            if (viewName === 'automation') initAutomationView();
+            if (viewName === 'escalations') loadEscalations();
+        }
+
+        window.addEventListener('hashchange', () => {
+            const rawHash = (window.location.hash || '').replace('#', '').trim();
+            const validViews = ['customers', 'history', 'live-call', 'automation', 'escalations'];
+            if (validViews.includes(rawHash)) {
+                navigate(rawHash);
+            }
+        });
+
+        // ==========================================
+        // SECTION A: CUSTOMERS
+        // ==========================================
+        async function loadCustomers() {
+            const tbody = document.getElementById('customers-tbody');
+            const emptyState = document.getElementById('customers-empty');
+            const searchVal = document.getElementById('customer-search-input').value.trim();
+
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading customers from database...</td></tr>`;
+            emptyState.classList.add('hidden');
+
+            try {
+                let url = `${API_BASE}/api/customers`;
+                if (searchVal) url += `?q=${encodeURIComponent(searchVal)}`;
+                let res = await fetch(url, { headers: authHeaders() });
+                if (res.status === 401) {
+                    const ok = await ensureAuth();
+                    if (ok) res = await fetch(url, { headers: authHeaders() });
+                }
+                if (res.status === 401) return logout();
+                allCustomers = await res.json();
+
+                if (!allCustomers || allCustomers.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                tbody.innerHTML = allCustomers.map(c => `
+                    <tr>
+                        <td><strong>${escapeHtml(c.external_customer_id)}</strong></td>
+                        <td>${escapeHtml(c.name && c.name !== 'N/A' ? c.name : c.external_customer_id)}</td>
+                        <td>${escapeHtml(c.phone || 'N/A')}</td>
+                        <td>${c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}</td>
+                        <td><span class="badge badge-gray">${c.call_count} calls</span></td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; gap: 0.4rem; justify-content: flex-end;">
+                                <button class="btn btn-primary btn-sm" onclick="goToLiveCall('${c.external_customer_id}')">
+                                    📞 Live Call
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="openEditCustomerModal(${c.id}, '${escapeHtml(c.external_customer_id)}', '${escapeHtml(c.name || '')}', '${escapeHtml(c.phone || '')}')">
+                                    ✏️ Edit
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${c.id}, '${escapeHtml(c.name || c.external_customer_id)}')">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" style="color: var(--danger); text-align: center;">Error loading customers: ${err.message}</td></tr>`;
+            }
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(loadCustomers, 300);
+        }
+
+        function openAddCustomerModal() {
+            document.getElementById('cust-modal-title').textContent = 'Add Customer';
+            document.getElementById('cust-form-id').value = '';
+            document.getElementById('cust-form-ext-id').value = `CUST_${Date.now().toString().slice(-4)}`;
+            document.getElementById('cust-form-name').value = '';
+            document.getElementById('cust-form-phone').value = '';
+            document.getElementById('modal-customer').classList.remove('hidden');
+        }
+
+        function openEditCustomerModal(id, extId, name, phone) {
+            document.getElementById('cust-modal-title').textContent = 'Edit Customer';
+            document.getElementById('cust-form-id').value = id;
+            document.getElementById('cust-form-ext-id').value = extId;
+            document.getElementById('cust-form-name').value = name;
+            document.getElementById('cust-form-phone').value = phone;
+            document.getElementById('modal-customer').classList.remove('hidden');
+        }
+
+        function closeCustomerModal() {
+            document.getElementById('modal-customer').classList.add('hidden');
+        }
+
+        document.getElementById('customer-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('cust-form-id').value;
+            const extId = document.getElementById('cust-form-ext-id').value.trim();
+            const name = document.getElementById('cust-form-name').value.trim();
+            const phone = document.getElementById('cust-form-phone').value.trim();
+
+            const formData = new FormData();
+            formData.append('external_customer_id', extId);
+            formData.append('name', name);
+            formData.append('phone', phone);
+
+            try {
+                let url = `${API_BASE}/api/customers`;
+                let method = 'POST';
+                if (id) {
+                    url = `${API_BASE}/api/customers/${id}`;
+                    method = 'PUT';
+                }
+                const res = await fetch(url, { method, headers: authHeaders(), body: formData });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to save customer');
+
+                closeCustomerModal();
+                loadCustomers();
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        });
+
+        async function deleteCustomer(id, name) {
+            if (!confirm(`Are you sure you want to delete customer "${name}" and all their call records?`)) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/customers/${id}`, { method: 'DELETE', headers: authHeaders() });
+                if (!res.ok) throw new Error('Failed to delete customer');
+                loadCustomers();
+            } catch (err) {
+                alert(`Error deleting customer: ${err.message}`);
+            }
+        }
+
+        // ==========================================
+        // SECTION B: CALL HISTORY
+        // ==========================================
+        async function loadCallHistory() {
+            const tbody = document.getElementById('calls-tbody');
+            const emptyState = document.getElementById('calls-empty');
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading persistent call history...</td></tr>`;
+            emptyState.classList.add('hidden');
+
+            try {
+                let res = await fetch(`${API_BASE}/api/calls`, { headers: authHeaders() });
+                if (res.status === 401) {
+                    const ok = await ensureAuth();
+                    if (ok) res = await fetch(`${API_BASE}/api/calls`, { headers: authHeaders() });
+                }
+                if (res.status === 401) return logout();
+                const calls = await res.json();
+
+                if (!calls || calls.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                tbody.innerHTML = calls.map(c => `
+                    <tr>
+                        <td><strong>#${c.id}</strong></td>
+                        <td>${escapeHtml(c.customer_name)}</td>
+                        <td>${escapeHtml(c.customer_phone)}</td>
+                        <td><span class="badge badge-gray">${escapeHtml(c.language || 'en')}</span></td>
+                        <td><span class="badge ${c.status === 'RESOLVED' ? 'badge-success' : (c.status === 'ESCALATED' ? 'badge-danger' : 'badge-primary')}">${c.status}</span></td>
+                        <td>${c.started_at ? new Date(c.started_at).toLocaleString() : '-'}</td>
+                        <td>${c.duration_seconds !== null ? `${c.duration_seconds}s` : 'In Progress'}</td>
+                        <td><span class="badge badge-gray">${c.message_count} msgs</span></td>
+                        <td>${c.has_requirements ? '<span class="badge badge-success">✓ Captured</span>' : '<span class="badge badge-gray">None</span>'}</td>
+                        <td style="text-align: right;">
+                            <button class="btn btn-secondary btn-sm" onclick="viewCallDetails(${c.id})">
+                                View Details 📜
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="10" style="color: var(--danger); text-align: center;">Error loading calls: ${err.message}</td></tr>`;
+            }
+        }
+
+        async function viewCallDetails(callId) {
+            try {
+                let res = await fetch(`${API_BASE}/api/calls/${callId}`, { headers: authHeaders() });
+                if (res.status === 401) {
+                    const ok = await ensureAuth();
+                    if (ok) res = await fetch(`${API_BASE}/api/calls/${callId}`, { headers: authHeaders() });
+                }
+                if (!res.ok) throw new Error('Failed to load call details');
+                const data = await res.json();
+
+                document.getElementById('modal-detail-call-id').textContent = `Call ID: #${data.call.id}`;
+                document.getElementById('detail-cust-name').textContent = data.customer.name;
+                document.getElementById('detail-cust-phone').textContent = data.customer.phone;
+                document.getElementById('detail-call-status').textContent = data.call.status;
+                document.getElementById('detail-call-status').className = `badge ${data.call.status === 'RESOLVED' ? 'badge-success' : (data.call.status === 'ESCALATED' ? 'badge-danger' : 'badge-primary')}`;
+                document.getElementById('detail-call-lang').textContent = data.call.language.toUpperCase();
+                document.getElementById('detail-call-started').textContent = data.call.started_at ? new Date(data.call.started_at).toLocaleString() : '-';
+                document.getElementById('detail-call-ended').textContent = data.call.ended_at ? new Date(data.call.ended_at).toLocaleString() : 'In Progress';
+
+                // Requirements
+                const reqBox = document.getElementById('detail-requirements-box');
+                if (data.requirements && data.requirements.structured) {
+                    const r = data.requirements.structured;
+                    reqBox.innerHTML = `
+                        <div><strong>Products / Services:</strong> ${escapeHtml(r.products_or_services || 'N/A')}</div>
+                        <div><strong>Requirements Summary:</strong> ${escapeHtml(r.requirements || 'N/A')}</div>
+                        <div><strong>Quantity / Scope:</strong> ${escapeHtml(r.quantity || 'N/A')}</div>
+                        <div><strong>Budget:</strong> ${escapeHtml(r.budget || 'N/A')}</div>
+                        <div><strong>Deadline:</strong> ${escapeHtml(r.deadline || 'N/A')}</div>
+                        ${r.important_details && r.important_details.length ? `<div><strong>Details:</strong> ${escapeHtml(r.important_details.join(', '))}</div>` : ''}
+                    `;
+                } else {
+                    reqBox.innerHTML = `<span style="color: var(--text-muted);">No structured requirements collected for this call.</span>`;
+                }
+
+                // Full Chronological Transcript
+                const transcriptBox = document.getElementById('detail-transcript-box');
+                if (!data.transcript || data.transcript.length === 0) {
+                    transcriptBox.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin: auto; padding: 1.5rem;">No conversation was recorded for this call.</div>`;
+                } else {
+                    transcriptBox.innerHTML = data.transcript.map(m => `
+                        <div class="chat-bubble ${m.speaker === 'customer' ? 'chat-customer' : 'chat-assistant'}">
+                            <div class="chat-speaker"><strong>${m.speaker === 'customer' ? 'Customer' : 'Assistant'}:</strong></div>
+                            <div>${escapeHtml(m.text)}</div>
+                            <div style="font-size: 0.65rem; opacity: 0.7; margin-top: 0.2rem;">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : ''}</div>
+                        </div>
+                    `).join('');
+                }
+
+                document.getElementById('modal-call-details').classList.remove('hidden');
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        function closeCallDetailsModal() {
+            document.getElementById('modal-call-details').classList.add('hidden');
+        }
+
+        // ==========================================
+        // SECTION C: LIVE CALL
+        // ==========================================
+        async function populateLiveCallDropdown(preSelectExtId = null) {
+            try {
+                let res = await fetch(`${API_BASE}/api/customers`, { headers: authHeaders() });
+                if (res.status === 401) {
+                    const ok = await ensureAuth();
+                    if (ok) res = await fetch(`${API_BASE}/api/customers`, { headers: authHeaders() });
+                }
+                if (res.status === 401) return logout();
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    allCustomers = data;
+                }
+                const dropdown = document.getElementById('live-customer-dropdown');
+                if (!dropdown) return;
+                if (!Array.isArray(allCustomers) || allCustomers.length === 0) {
+                    dropdown.innerHTML = '<option value="">No registered customers found</option>';
+                    return;
+                }
+                dropdown.innerHTML = allCustomers.map(c => `
+                    <option value="${c.external_customer_id}" data-id="${c.id}" ${preSelectExtId === c.external_customer_id ? 'selected' : ''}>
+                        ${escapeHtml(c.name && c.name !== 'N/A' ? c.name : c.external_customer_id)} (${escapeHtml(c.phone || c.external_customer_id)})
+                    </option>
+                `).join('');
+            } catch (err) {
+                console.error('Error populating live call dropdown:', err);
+            }
+        }
+
+        function goToLiveCall(extId) {
+            navigate('live-call');
+            populateLiveCallDropdown(extId);
+        }
+
+        // ==========================================
+        // SECTION D: AUTOMATED CALLING
+        // ==========================================
+        async function initAutomationView() {
+            try {
+                const res = await fetch(`${API_BASE}/api/customers`, { headers: authHeaders() });
+                allCustomers = await res.json();
+                const container = document.getElementById('auto-customer-select-list');
+                container.innerHTML = allCustomers.map(c => `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; background: #ffffff; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;">
+                        <input type="checkbox" name="auto_customer_check" value="${c.id}" checked>
+                        <span>${escapeHtml(c.name && c.name !== 'N/A' ? c.name : c.external_customer_id)} (${escapeHtml(c.phone || c.external_customer_id)})</span>
+                    </label>
+                `).join('');
+
+                pollAutomationStatus();
+                if (!autoPollingInterval) {
+                    autoPollingInterval = setInterval(pollAutomationStatus, 1500);
+                }
+            } catch (err) {
+                console.error('Error initializing automation:', err);
+            }
+        }
+
+        function toggleSelectAllCustomers(select) {
+            document.querySelectorAll('input[name="auto_customer_check"]').forEach(cb => cb.checked = select);
+        }
+
+        async function pollAutomationStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/automation/status`, { headers: authHeaders() });
+                if (!res.ok) return;
+                const status = await res.json();
+
+                document.getElementById('stat-auto-status').textContent = status.automation_status;
+                document.getElementById('stat-auto-waiting').textContent = status.outbound_queue.length + status.inbound_queue.length;
+                document.getElementById('stat-auto-completed').textContent = status.completed_calls;
+                document.getElementById('stat-auto-failed').textContent = status.failed_history.length;
+
+                const startBtn = document.getElementById('btn-start-auto');
+                const stopBtn = document.getElementById('btn-stop-auto');
+                const cancelCallBtn = document.getElementById('btn-stop-current-call');
+
+                startBtn.classList.toggle('hidden', status.is_running);
+                stopBtn.classList.toggle('hidden', !status.is_running);
+                cancelCallBtn.classList.toggle('hidden', !status.current_call_id);
+
+                const queueBox = document.getElementById('auto-queue-display');
+                let itemsHtml = '';
+
+                if (status.current_call_id) {
+                    itemsHtml += `
+                        <div style="background: var(--primary-light); border: 1px solid var(--primary-border); padding: 0.75rem 1rem; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <span class="badge badge-primary">IN CALL</span>
+                                <strong style="margin-left: 0.5rem;">${escapeHtml(status.current_customer_name || 'Customer')}</strong>
+                                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">Call #${status.current_call_id} (${status.current_call_type})</span>
+                            </div>
+                            <span class="pulse-dot"></span>
+                        </div>
+                    `;
+                }
+
+                status.outbound_queue.forEach((cid, idx) => {
+                    const cust = allCustomers.find(c => c.id === cid);
+                    itemsHtml += `
+                        <div style="background: #ffffff; border: 1px solid var(--border); padding: 0.6rem 1rem; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; font-size: 0.825rem;">
+                            <span>#${idx + 1} &nbsp; ${escapeHtml(cust ? (cust.name || cust.external_customer_id) : `Customer ID ${cid}`)}</span>
+                            <span class="badge badge-gray">WAITING</span>
+                        </div>
+                    `;
+                });
+
+                if (status.completed_history.length > 0) {
+                    itemsHtml += `<div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-top: 0.5rem;">RECENTLY COMPLETED:</div>`;
+                    status.completed_history.slice(-3).forEach(c => {
+                        itemsHtml += `
+                            <div style="background: var(--success-light); border: 1px solid var(--success-border); padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); font-size: 0.8rem; display: flex; justify-content: space-between;">
+                                <span>✓ ${escapeHtml(c.customer_name || 'Customer')} (Call #${c.call_id})</span>
+                                <span style="color: var(--success); font-weight: 600;">Resolved</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                if (!itemsHtml) {
+                    itemsHtml = `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-sm);">Queue is idle. Select customers and click "START AUTOMATED CALLING".</div>`;
+                }
+
+                queueBox.innerHTML = itemsHtml;
+            } catch (err) {
+                console.error('Error polling automation status:', err);
+            }
+        }
+
+        async function startAutomatedCalling() {
+            const selected = Array.from(document.querySelectorAll('input[name="auto_customer_check"]:checked')).map(cb => parseInt(cb.value));
+            if (selected.length === 0) {
+                alert('Please select at least one customer to queue for automated calling.');
+                return;
+            }
+
+            if (!confirm(`You are about to start automated calling for ${selected.length} customers.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/automation/start`, {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customer_ids: selected })
+                });
+                if (!res.ok) throw new Error('Failed to start automated queue');
+                pollAutomationStatus();
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function stopAutomatedCalling() {
+            try {
+                const res = await fetch(`${API_BASE}/api/automation/stop`, { method: 'POST', headers: authHeaders() });
+                if (!res.ok) throw new Error('Failed to stop automated queue');
+                pollAutomationStatus();
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function stopActiveCall() {
+            try {
+                await fetch(`${API_BASE}/api/automation/stop_call`, { method: 'POST', headers: authHeaders() });
+                pollAutomationStatus();
+            } catch (err) {
+                console.error('Error stopping active call:', err);
+            }
+        }
+
+        // ==========================================
+        // SECTION E: HUMAN ASSISTANCE
+        // ==========================================
+        // ==========================================
+        // SECTION E: HUMAN ASSISTANCE & CALLBACKS
+        // ==========================================
+        let cachedEscalations = [];
+        let currentEscFilter = 'all';
+
+        function filterEscalations(filter) {
+            currentEscFilter = filter;
+            ['all', 'waiting', 'callback_initiated', 'resolved'].forEach(f => {
+                const el = document.getElementById(`esc-pill-${f}`);
+                if (el) el.classList.toggle('active', f === filter);
+            });
+            renderEscalationsTable();
+        }
+
+        async function loadEscalations() {
+            const tbody = document.getElementById('escalations-tbody');
+            const emptyState = document.getElementById('escalations-empty');
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading human assistance requests...</td></tr>`;
+            emptyState.classList.add('hidden');
+
+            try {
+                let res = await fetch(`${API_BASE}/api/escalations`, { headers: authHeaders() });
+                if (res.status === 401) {
+                    const ok = await ensureAuth();
+                    if (ok) res = await fetch(`${API_BASE}/api/escalations`, { headers: authHeaders() });
+                }
+                if (res.status === 401) return logout();
+                cachedEscalations = await res.json();
+
+                const waitingCount = cachedEscalations.filter(e => {
+                    const st = (e.status || '').toLowerCase();
+                    return st === 'waiting' || st === 'pending';
+                }).length;
+                document.getElementById('nav-escalation-count').textContent = waitingCount;
+
+                renderEscalationsTable();
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="8" style="color: var(--danger); text-align: center;">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderEscalationsTable() {
+            const tbody = document.getElementById('escalations-tbody');
+            const emptyState = document.getElementById('escalations-empty');
+
+            let filtered = cachedEscalations;
+            if (currentEscFilter === 'waiting') {
+                filtered = cachedEscalations.filter(e => ['waiting', 'pending'].includes((e.status || '').toLowerCase()));
+            } else if (currentEscFilter === 'callback_initiated') {
+                filtered = cachedEscalations.filter(e => (e.status || '').toLowerCase() === 'callback_initiated');
+            } else if (currentEscFilter === 'resolved') {
+                filtered = cachedEscalations.filter(e => ['resolved', 'contacted', 'callback_completed'].includes((e.status || '').toLowerCase()));
+            }
+
+            if (!filtered || filtered.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            tbody.innerHTML = filtered.map(e => {
+                const st = (e.status || '').toLowerCase();
+                let badgeClass = 'badge-amber';
+                let displayStatus = 'Waiting for Callback';
+
+                if (st === 'callback_initiated') {
+                    badgeClass = 'badge-info';
+                    displayStatus = 'Callback Initiated';
+                } else if (st === 'contacted' || st === 'callback_completed') {
+                    badgeClass = 'badge-success';
+                    displayStatus = 'Callback Completed';
+                } else if (st === 'resolved') {
+                    badgeClass = 'badge-gray';
+                    displayStatus = 'Resolved';
+                }
+
+                const lang = e.language || e.language_selected || 'en';
+                const reason = e.reason || e.escalation_reason || 'Human assistance requested';
+                const custName = e.customer_name || 'Customer';
+                const custPhone = e.customer_phone || 'N/A';
+
+                return `
+                    <tr>
+                        <td><strong>#${e.id}</strong></td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-size: 0.75rem; font-weight: 700;">
+                                    ${escapeHtml(custName.charAt(0).toUpperCase())}
+                                </span>
+                                <span style="font-weight: 600;">${escapeHtml(custName)}</span>
+                            </div>
+                        </td>
+                        <td><strong>${escapeHtml(custPhone)}</strong></td>
+                        <td><span class="badge ${lang === 'Hindi' ? 'badge-primary' : lang === 'Marathi' ? 'badge-info' : 'badge-gray'}">${escapeHtml(lang)}</span></td>
+                        <td><span style="color: var(--text-main); font-size: 0.825rem;">${escapeHtml(reason)}</span></td>
+                        <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
+                        <td><span style="font-size: 0.775rem; color: var(--text-muted);">${e.created_at ? new Date(e.created_at).toLocaleString() : '-'}</span></td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                                ${st === 'waiting' || st === 'pending' ? `
+                                    <button class="btn btn-call-back btn-sm" onclick="openCallbackModal(${e.id}, '${escapeHtml(custName)}', '${escapeHtml(custPhone)}', '${escapeHtml(lang)}')">
+                                        📞 Call Back
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" onclick="viewCallDetails(${e.call_id})">Transcript</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="openResolveModal(${e.id}, '${escapeHtml(custName)}')">Resolve</button>
+                                ` : st === 'callback_initiated' ? `
+                                    <button class="btn btn-complete-cb btn-sm" onclick="completeCallback(${e.id})">
+                                        ✓ Complete Callback
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" onclick="viewCallDetails(${e.call_id})">Transcript</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="openResolveModal(${e.id}, '${escapeHtml(custName)}')">Resolve</button>
+                                ` : st === 'contacted' || st === 'callback_completed' ? `
+                                    <button class="btn btn-primary btn-sm" onclick="openResolveModal(${e.id}, '${escapeHtml(custName)}')">Resolve</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="viewCallDetails(${e.call_id})">Transcript</button>
+                                ` : `
+                                    <button class="btn btn-secondary btn-sm" onclick="viewCallDetails(${e.call_id})">Transcript</button>
+                                    <span style="color: var(--success); font-weight: 600; font-size: 0.8rem; margin-left: 0.25rem;">Resolved ✓</span>
+                                `}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openCallbackModal(id, name, phone, lang) {
+            document.getElementById('cb-modal-esc-id').value = id;
+            document.getElementById('cb-modal-cust-name').textContent = name;
+            document.getElementById('cb-modal-cust-phone').textContent = phone;
+            document.getElementById('cb-modal-cust-lang').textContent = lang;
+            document.getElementById('cb-modal-notes').value = '';
+            document.getElementById('modal-callback-confirm').classList.remove('hidden');
+        }
+
+        function closeCallbackModal() {
+            document.getElementById('modal-callback-confirm').classList.add('hidden');
+        }
+
+        async function confirmInitiateCallback() {
+            const id = document.getElementById('cb-modal-esc-id').value;
+            const notes = document.getElementById('cb-modal-notes').value.trim();
+            const custName = document.getElementById('cb-modal-cust-name').textContent;
+            const custPhone = document.getElementById('cb-modal-cust-phone').textContent;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/escalations/${id}/callback`, {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to initiate callback');
+
+                closeCallbackModal();
+                loadEscalations();
+
+                const statusMsg = data.telephony_active
+                    ? `📞 Live outbound call initiated to ${custName} (${custPhone})`
+                    : `📋 Callback initiated for ${custName} (${custPhone}). Telephony gateway pending configuration.`;
+                showToast(statusMsg);
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function completeCallback(id) {
+            try {
+                const res = await fetch(`${API_BASE}/api/escalations/${id}/callback-complete`, {
+                    method: 'PUT',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes: 'Operator completed callback with customer.' })
+                });
+                if (!res.ok) throw new Error('Failed to mark callback as completed');
+                loadEscalations();
+                showToast('✓ Callback marked as completed in support records.');
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function markEscalationContacted(id) {
+            try {
+                const res = await fetch(`${API_BASE}/api/escalations/${id}/contacted`, {
+                    method: 'PUT',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes: 'Marked as contacted by operator.' })
+                });
+                if (!res.ok) throw new Error('Failed to mark as contacted');
+                loadEscalations();
+                showToast('Status updated to Contacted.');
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        function openResolveModal(id, custName) {
+            document.getElementById('resolve-esc-id').value = id;
+            document.getElementById('resolve-cust-name').textContent = custName;
+            document.getElementById('resolve-notes').value = '';
+            document.getElementById('modal-resolve-esc').classList.remove('hidden');
+        }
+
+        function closeResolveModal() {
+            document.getElementById('modal-resolve-esc').classList.add('hidden');
+        }
+
+        async function submitResolveEscalation() {
+            const id = document.getElementById('resolve-esc-id').value;
+            const notes = document.getElementById('resolve-notes').value.trim();
+            try {
+                const res = await fetch(`${API_BASE}/api/escalations/${id}/resolve`, {
+                    method: 'PUT',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
+                });
+                if (!res.ok) throw new Error('Failed to resolve escalation');
+                closeResolveModal();
+                loadEscalations();
+                showToast('✓ Escalation marked as resolved.');
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        async function scheduleCallback(id) {
+            // Reuses openCallbackModal if item is in cache
+            const item = cachedEscalations.find(e => e.id === id);
+            if (item) {
+                openCallbackModal(item.id, item.customer_name || 'Customer', item.customer_phone || 'N/A', item.language || 'English');
+            } else {
+                openCallbackModal(id, 'Customer', 'Registered Phone', 'English');
+            }
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            container.innerHTML = `<div class="toast-box"><span>ℹ️</span><div>${escapeHtml(message)}</div></div>`;
+            container.classList.remove('hidden');
+            setTimeout(() => {
+                container.classList.add('hidden');
+            }, 4500);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.toString().replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // ==========================================
+        // IN-APP LIVE VOICE CALLING OVER WEBSOCKET
+        // ==========================================
+        let liveWs = null;
+        let liveStream = null;
+        let liveRecorder = null;
+        let liveAudioContext = null;
+        let liveAnalyser = null;
+        let livePreRollDelay = null;
+        let livePreRollGain = null;
+        let livePreRollDest = null;
+        let livePreRollStream = null;
+        let isLiveCallActive = false;
+        let isAssistantSpeaking = false;
+        let isAssistantProcessing = false;
+        let isUserSpeaking = false;
+        let assistantPlaybackStartTime = 0;
+        let echoCooldownUntil = 0;
+        let isPreRollMuted = false;
+        let turnStartTime = 0;
+        let liveLiveAudioChunks = [];
+        let speechDetectionInterval = null;
+        let liveActiveCallId = null;
+
+        // Configurable Voice Activity Detection (VAD) & Pre-Roll Parameters
+        const VAD_CONFIG = {
+            intervalMs: 80,
+            speechBinStart: 3,            // Skip 0-2 (<280Hz) to reject fan noise & 50/60Hz AC hum
+            speechBinEnd: 36,             // Vocal formants up to ~3.4kHz
+            speechThreshold: 22,          // Real voice vocal energy threshold (clear voice is 28-80)
+            silenceThreshold: 18,         // Hysteresis silence cutoff threshold (calibrated above ambient fan hum)
+            speechFramesTrigger: 1,       // 1 * 80ms = 80ms fast trigger to prevent losing initial consonants
+            silenceFramesLimit: 14,       // 14 * 80ms = ~1.12s natural conversational pause threshold (prevents mid-sentence cuts)
+            maxTurnDurationMs: 15000,     // Generous 15s limit: prevents cutting off detailed caller questions
+            preRollSeconds: 0.40,         // Pre-roll duration
+        };
+
+        function logSip(msg) {
+            console.log('[LiveVoice]', msg);
+            const box = document.getElementById('sip-log-box');
+            if (box) {
+                const time = new Date().toLocaleTimeString();
+                box.innerHTML += `<div>[${time}] ${escapeHtml(msg)}</div>`;
+                box.scrollTop = box.scrollHeight;
+            }
+        }
+
+        function updateLiveCallStatus(statusText, badgeClass) {
+            const pill = document.getElementById('webrtc-call-status-pill');
+            if (pill) {
+                pill.textContent = statusText;
+                pill.className = `badge ${badgeClass}`;
+            }
+            const headerPill = document.getElementById('live-call-status-pill');
+            if (headerPill) {
+                headerPill.textContent = statusText;
+                headerPill.className = `badge ${badgeClass}`;
+            }
+        }
+
+        function updateWsStatus(statusText, badgeClass) {
+            const pill = document.getElementById('sip-reg-status');
+            if (pill) {
+                pill.textContent = statusText;
+                pill.className = `badge ${badgeClass}`;
+                if (statusText === 'WS: DISCONNECTED') {
+                    pill.classList.add('hidden');
+                } else {
+                    pill.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Primary state manager: Clearly displays Listening, Processing, AI Speaking, and Microphone Error
+        function setVoiceState(state, desc) {
+            const micIndicator = document.getElementById('live-mic-indicator');
+            const orb = document.getElementById('live-voice-orb');
+            const orbText = document.getElementById('live-orb-status-text');
+            const orbEmoji = document.getElementById('live-orb-emoji');
+            const descEl = document.getElementById('live-state-description');
+
+            if (state === 'listening') {
+                if (micIndicator) {
+                    micIndicator.textContent = '🎙️ Listening';
+                    micIndicator.className = 'badge badge-success';
+                }
+                updateLiveCallStatus('LISTENING', 'badge-success');
+                if (orb) orb.className = 'live-voice-orb listening';
+                if (orbText) orbText.textContent = 'Listening';
+                if (orbEmoji) orbEmoji.textContent = '🎙️';
+                if (descEl) descEl.textContent = desc || 'Microphone is active. Speak naturally...';
+            }
+            else if (state === 'capturing') {
+                if (micIndicator) {
+                    micIndicator.textContent = '🔴 Capturing Speech';
+                    micIndicator.className = 'badge badge-danger';
+                }
+                updateLiveCallStatus('CAPTURING SPEECH 🎤', 'badge-warning');
+                if (orb) orb.className = 'live-voice-orb listening';
+                if (orbText) orbText.textContent = 'Listening (Capturing)';
+                if (orbEmoji) orbEmoji.textContent = '🗣️';
+                if (descEl) descEl.textContent = desc || 'Recording speech...';
+            }
+            else if (state === 'processing') {
+                if (micIndicator) {
+                    micIndicator.textContent = '⏳ Processing';
+                    micIndicator.className = 'badge badge-warning';
+                }
+                updateLiveCallStatus('PROCESSING', 'badge-warning');
+                if (orb) orb.className = 'live-voice-orb thinking';
+                if (orbText) orbText.textContent = 'Processing';
+                if (orbEmoji) orbEmoji.textContent = '⏳';
+                if (descEl) descEl.textContent = desc || 'Finished capturing speech. Generating AI response...';
+            }
+            else if (state === 'speaking') {
+                if (micIndicator) {
+                    micIndicator.textContent = '🔊 AI Speaking';
+                    micIndicator.className = 'badge badge-primary';
+                }
+                updateLiveCallStatus('AI SPEAKING 🔊', 'badge-primary');
+                if (orb) orb.className = 'live-voice-orb speaking';
+                if (orbText) orbText.textContent = 'AI Speaking';
+                if (orbEmoji) orbEmoji.textContent = '🔊';
+                if (descEl) descEl.textContent = desc || 'Assistant is speaking. (Click Interrupt anytime)';
+            }
+            else if (state === 'error') {
+                if (micIndicator) {
+                    micIndicator.textContent = '⚠️ Microphone Error';
+                    micIndicator.className = 'badge badge-danger';
+                }
+                updateLiveCallStatus('MICROPHONE ERROR', 'badge-danger');
+                if (orb) orb.className = 'live-voice-orb error';
+                if (orbText) orbText.textContent = 'Microphone Error';
+                if (orbEmoji) orbEmoji.textContent = '⚠️';
+                if (descEl) descEl.textContent = desc || 'Could not access microphone. Please check browser permissions.';
+            }
+        }
+
+        function updateLiveMicIndicator(statusText, badgeClass) {
+            const el = document.getElementById('live-mic-indicator');
+            if (el) {
+                if (statusText) el.textContent = statusText;
+                if (badgeClass) el.className = `badge ${badgeClass}`;
+            }
+            return el;
+        }
+
+        function setLiveOrbState(state, text, emoji) {
+            const orb = document.getElementById('live-voice-orb');
+            const orbText = document.getElementById('live-orb-status-text');
+            const orbEmoji = document.getElementById('live-orb-emoji');
+            if (orb && state) orb.className = `live-voice-orb ${state}`;
+            if (orbText && text) orbText.textContent = text;
+            if (orbEmoji && emoji) orbEmoji.textContent = emoji;
+        }
+
+        function mutePreRollGain(mute) {
+            if (!livePreRollGain || !liveAudioContext) return;
+            try {
+                if (mute && !isPreRollMuted) {
+                    livePreRollGain.gain.setValueAtTime(0, liveAudioContext.currentTime);
+                    isPreRollMuted = true;
+                } else if (!mute && isPreRollMuted) {
+                    livePreRollGain.gain.setValueAtTime(1.0, liveAudioContext.currentTime);
+                    isPreRollMuted = false;
+                }
+            } catch (e) {}
+        }
+
+        async function startLiveVoiceCall() {
+            if (isLiveCallActive) {
+                logSip('Live voice call is already active.');
+                return;
+            }
+
+            let token = authToken || localStorage.getItem('auth_token');
+            if (!token) {
+                try {
+                    logSip('Acquiring secure guest caller session for in-app voice...');
+                    const sessionRes = await fetch(`${API_BASE}/api/auth/caller-session`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+                        body: JSON.stringify({ client_type: 'web', caller_name: 'Web Caller' })
+                    });
+                    if (sessionRes.ok) {
+                        const sData = await sessionRes.json();
+                        token = sData.access_token;
+                    }
+                } catch (e) {
+                    console.warn('Caller session fallback failed:', e);
+                }
+            }
+            if (!token) {
+                alert('Please sign in or start a caller session.');
+                return;
+            }
+
+            const customerSelect = document.getElementById('live-customer-dropdown');
+            let customerId = '';
+            if (customerSelect && customerSelect.selectedIndex >= 0) {
+                const selOpt = customerSelect.options[customerSelect.selectedIndex];
+                customerId = (selOpt && selOpt.getAttribute('data-id')) ? selOpt.getAttribute('data-id') : (customerSelect.value || '');
+            }
+
+            const startBtn = document.getElementById('btn-sip-call');
+            const hangupBtn = document.getElementById('btn-sip-hangup');
+            const interruptBtn = document.getElementById('btn-live-interrupt');
+            const micIndicator = document.getElementById('live-mic-indicator');
+
+            if (startBtn) startBtn.disabled = true;
+            updateWsStatus('WS: CONNECTING...', 'badge-warning');
+            updateLiveCallStatus('CONNECTING...', 'badge-warning');
+            logSip('Requesting microphone access for live voice calling...');
+
+            // Clear previous transcript for a fresh conversation session
+            const transcriptBox = document.getElementById('live-transcript-box');
+            if (transcriptBox) {
+                transcriptBox.innerHTML = '<div style="text-align: center; color: var(--text-subtle); margin: auto; font-size: 0.85rem;">Connecting live conversation...</div>';
+            }
+            const transcriptBadge = document.getElementById('live-transcript-count');
+            if (transcriptBadge) transcriptBadge.textContent = '0 messages';
+
+            try {
+                liveStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        channelCount: 1,
+                    }
+                });
+                logSip('Microphone access granted.');
+
+                // Switch UI from Pre-Call Card to Active Call Panel
+                const preCallCard = document.getElementById('live-pre-call-card');
+                const activePanel = document.getElementById('live-call-active-panel') || document.getElementById('live-call-session-panel');
+                if (preCallCard) preCallCard.classList.add('hidden');
+                if (activePanel) activePanel.classList.remove('hidden');
+
+                // Determine WebSocket endpoint
+                const parsedBase = new URL(API_BASE, window.location.href);
+                const wsProto = (parsedBase.protocol === 'https:' || window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+                const host = parsedBase.host || window.location.host || 'localhost:8000';
+
+                // Optional company_id parameter from current page URL
+                const pageUrlParams = new URLSearchParams(window.location.search);
+                const companyId = (pageUrlParams.get('company_id') || '').trim();
+                const companyQuery = companyId ? `&company_id=${encodeURIComponent(companyId)}` : '';
+
+                const wsUrl = `${wsProto}//${host}/api/ws/live-call?token=${encodeURIComponent(token)}${customerId ? '&customer_id=' + encodeURIComponent(customerId) : ''}${companyQuery}`;
+
+                logSip(`Connecting to real-time voice endpoint: ${wsProto}//${host}/api/ws/live-call${companyId ? ' (company: ' + companyId + ')' : ''}`);
+                liveWs = new WebSocket(wsUrl);
+                liveWs.binaryType = 'arraybuffer';
+
+                liveWs.onopen = () => {
+                    logSip('WebSocket connected. Initializing live voice session...');
+                    updateWsStatus('WS: CONNECTED', 'badge-success');
+                    isLiveCallActive = true;
+                    isAssistantSpeaking = true;
+
+                    if (startBtn) startBtn.classList.add('hidden');
+                    if (hangupBtn) hangupBtn.classList.remove('hidden');
+                    if (interruptBtn) interruptBtn.classList.remove('hidden');
+                    if (micIndicator) micIndicator.classList.remove('hidden');
+
+                    setVoiceState('speaking', 'Connecting... Assistant greeting will play shortly.');
+                    setupAudioVAD(liveStream);
+                };
+
+                liveWs.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleLiveVoiceEvent(data);
+                    } catch (e) {
+                        console.warn('[LiveVoice] Non-JSON message from server:', e);
+                    }
+                };
+
+                liveWs.onerror = (err) => {
+                    logSip('WebSocket connection error.');
+                    updateWsStatus('WS: ERROR', 'badge-danger');
+                };
+
+                liveWs.onclose = (event) => {
+                    if (event.code === 1008) {
+                        logSip('Authentication failed (code: 1008): Invalid or expired token. Please sign in again.');
+                        updateWsStatus('WS: AUTH FAILED', 'badge-danger');
+                        updateLiveCallStatus('AUTH ERROR', 'badge-danger');
+                        alert('Your session token has expired or is invalid. Please sign in again.');
+                    } else if (event.code === 1006) {
+                        logSip('WebSocket connection failed abnormally (code: 1006). Verify server is running and authenticated.');
+                        updateWsStatus('WS: FAILED', 'badge-danger');
+                        updateLiveCallStatus('DISCONNECTED', 'badge-danger');
+                    } else {
+                        logSip(`WebSocket connection closed (code: ${event.code}).`);
+                        updateWsStatus('WS: DISCONNECTED', 'badge-gray');
+                    }
+                    cleanupLiveVoiceCall();
+                };
+
+            } catch (err) {
+                logSip(`Microphone access failed: ${err.message}`);
+                const preCallCard = document.getElementById('live-pre-call-card');
+                const activePanel = document.getElementById('live-call-active-panel');
+                if (preCallCard) preCallCard.classList.add('hidden');
+                if (activePanel) activePanel.classList.remove('hidden');
+                const hangupBtn = document.getElementById('btn-sip-hangup');
+                if (hangupBtn) hangupBtn.classList.remove('hidden');
+                if (startBtn) startBtn.classList.add('hidden');
+                const micIndicator = document.getElementById('live-mic-indicator');
+                if (micIndicator) micIndicator.classList.remove('hidden');
+                setVoiceState('error', `Microphone Error: ${err.message}. Please check browser microphone permissions.`);
+            }
+        }
+
+        let liveAudioQueue = [];
+        let isLiveAudioPlaying = false;
+        let hasStreamedChunksThisTurn = false;
+        let pendingCallEndedReason = null;
+
+        function clearLiveAudioQueue() {
+            liveAudioQueue = [];
+            isLiveAudioPlaying = false;
+            hasStreamedChunksThisTurn = false;
+            pendingCallEndedReason = null;
+            const remoteAudio = document.getElementById('webrtc-remote-audio');
+            if (remoteAudio) {
+                try {
+                    remoteAudio.pause();
+                    remoteAudio.currentTime = 0;
+                    remoteAudio.removeAttribute('src');
+                    remoteAudio.load();
+                } catch (e) {}
+            }
+        }
+
+        function playNextLiveAudioChunk() {
+            const remoteAudio = document.getElementById('webrtc-remote-audio');
+            if (!remoteAudio || !isLiveCallActive || liveAudioQueue.length === 0) {
+                isLiveAudioPlaying = false;
+                if (!isAssistantProcessing && !isLiveAudioPlaying) {
+                    isAssistantSpeaking = false;
+                    if (pendingCallEndedReason) {
+                        const reason = pendingCallEndedReason;
+                        pendingCallEndedReason = null;
+                        handleLiveCallEnded(reason);
+                        return;
+                    }
+                    echoCooldownUntil = Date.now() + 400;
+                    if (isLiveCallActive) {
+                        setTimeout(() => {
+                            if (isLiveCallActive && !isAssistantSpeaking && !isLiveAudioPlaying) {
+                                mutePreRollGain(false);
+                                setVoiceState('listening');
+                            }
+                        }, 400);
+                    }
+                }
+                return;
+            }
+
+            const nextChunk = liveAudioQueue.shift();
+            // Discard chunk if call ID changed
+            if (nextChunk.callId !== liveActiveCallId) {
+                playNextLiveAudioChunk();
+                return;
+            }
+
+            isLiveAudioPlaying = true;
+            isAssistantSpeaking = true;
+            mutePreRollGain(true);
+            setVoiceState('speaking');
+
+            remoteAudio.src = resolveAudioUrl(nextChunk.audioUrl);
+            remoteAudio.load();
+
+            const playPromise = remoteAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => {
+                    if (e.name !== 'AbortError') {
+                        console.warn('[LiveVoice] Playback notice for chunk:', e);
+                    }
+                    playNextLiveAudioChunk();
+                });
+            }
+
+            remoteAudio.onerror = () => {
+                playNextLiveAudioChunk();
+            };
+
+            remoteAudio.onended = () => {
+                playNextLiveAudioChunk();
+            };
+        }
+
+        function handleLiveVoiceEvent(data) {
+            const remoteAudio = document.getElementById('webrtc-remote-audio');
+
+            if (data.event === 'session_started') {
+                liveActiveCallId = data.call_id;
+                clearLiveAudioQueue();
+                logSip(`Voice session active | Call #${data.call_id} | Customer: ${data.customer_name || 'Live User'}`);
+                isAssistantSpeaking = true;
+                setVoiceState('speaking', 'Starting call... Assistant greeting will play shortly.');
+
+                const custNameEl = document.getElementById('live-active-cust-name');
+                const custMetaEl = document.getElementById('live-active-cust-meta');
+                const preCallCard = document.getElementById('live-pre-call-card');
+                const activePanel = document.getElementById('live-call-active-panel') || document.getElementById('live-call-session-panel');
+                if (custNameEl) custNameEl.textContent = data.customer_name || 'Live Voice Customer';
+                if (custMetaEl) custMetaEl.textContent = `Call #${data.call_id} • Phone: ${data.customer_phone || 'WebRTC/WS Live'}`;
+                if (preCallCard) preCallCard.classList.add('hidden');
+                if (activePanel) activePanel.classList.remove('hidden');
+            }
+            else if (data.event === 'processing') {
+                isAssistantProcessing = true;
+                hasStreamedChunksThisTurn = false;
+                setVoiceState('processing', 'Finished capturing speech. Generating AI response...');
+            }
+            else if (data.event === 'assistant_chunk') {
+                if (!isLiveCallActive || data.call_id !== liveActiveCallId) {
+                    console.warn('[LiveVoice] Discarding audio chunk for inactive/mismatched call:', data.call_id);
+                    return;
+                }
+                if (!data.audio_url) return;
+
+                isAssistantProcessing = false;
+                hasStreamedChunksThisTurn = true;
+
+                liveAudioQueue.push({
+                    chunkIndex: data.chunk_index,
+                    audioUrl: data.audio_url,
+                    text: data.text || '',
+                    callId: data.call_id
+                });
+                liveAudioQueue.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+                if (!isLiveAudioPlaying) {
+                    playNextLiveAudioChunk();
+                }
+            }
+            else if (data.event === 'assistant_response') {
+                isAssistantProcessing = false;
+                if (data.transcript) {
+                    const durText = data.audio_duration ? ` (${data.audio_duration.toFixed(1)}s)` : '';
+                    logSip(`User${durText}: "${data.transcript}"`);
+                    appendMessageToTranscriptBox('customer', data.transcript);
+                }
+                logSip(`AI: "${data.response}"`);
+                appendMessageToTranscriptBox('assistant', data.response);
+
+                const isEnding = Boolean(data.session_ended || data.is_escalated);
+
+                if (isEnding) {
+                    // Cease recording immediately when call ends or transfers
+                    isLiveCallActive = false;
+                    mutePreRollGain(true);
+                    if (speechDetectionInterval) {
+                        clearInterval(speechDetectionInterval);
+                        speechDetectionInterval = null;
+                    }
+                    if (liveRecorder && liveRecorder.state !== 'inactive') {
+                        try { liveRecorder.stop(); } catch (e) {}
+                    }
+                    updateLiveCallStatus(data.is_escalated ? 'TRANSFERRED' : 'ENDED', data.is_escalated ? 'badge-warning' : 'badge-gray');
+                }
+
+                if (hasStreamedChunksThisTurn) {
+                    hasStreamedChunksThisTurn = false;
+                    if (isEnding) {
+                        if (isLiveAudioPlaying || liveAudioQueue.length > 0) {
+                            pendingCallEndedReason = data.is_escalated ? 'escalated' : 'ended';
+                        } else {
+                            handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
+                        }
+                    } else if (!isLiveAudioPlaying && liveAudioQueue.length === 0) {
+                        echoCooldownUntil = Date.now() + 400;
+                        mutePreRollGain(false);
+                        setVoiceState('listening');
+                    }
+                    return;
+                }
+
+                if (data.audio_url && remoteAudio) {
+                    isAssistantSpeaking = true;
+                    assistantPlaybackStartTime = Date.now();
+                    mutePreRollGain(true);
+                    setVoiceState('speaking', isEnding ? (data.is_escalated ? 'Connecting to human representative...' : 'Call completed.') : undefined);
+
+                    remoteAudio.src = resolveAudioUrl(data.audio_url);
+                    remoteAudio.load();
+                    const playPromise = remoteAudio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => {
+                            if (e.name !== 'AbortError') {
+                                console.warn('[LiveVoice] Playback notice:', e);
+                            }
+                            isAssistantSpeaking = false;
+                            if (isEnding) {
+                                handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
+                            } else {
+                                setVoiceState('listening');
+                            }
+                        });
+                    }
+
+                    remoteAudio.onerror = () => {
+                        isAssistantSpeaking = false;
+                        if (isEnding) {
+                            handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
+                        } else {
+                            setVoiceState('listening');
+                        }
+                    };
+
+                    remoteAudio.onended = () => {
+                        isAssistantSpeaking = false;
+                        if (isEnding) {
+                            handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
+                            return;
+                        }
+                        echoCooldownUntil = Date.now() + 400; // 400ms acoustic echo drain
+                        if (isLiveCallActive) {
+                            setTimeout(() => {
+                                if (isLiveCallActive && !isAssistantSpeaking) {
+                                    mutePreRollGain(false);
+                                    setVoiceState('listening');
+                                }
+                            }, 400);
+                        }
+                    };
+                } else {
+                    isAssistantSpeaking = false;
+                    if (isEnding) {
+                        handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
+                    } else {
+                        echoCooldownUntil = Date.now() + 300;
+                        mutePreRollGain(false);
+                        setVoiceState('listening');
+                    }
+                }
+            }
+            else if (data.event === 'session_ended') {
+                clearLiveAudioQueue();
+                isAssistantProcessing = false;
+                isLiveCallActive = false;
+                mutePreRollGain(true);
+                logSip(`Call session ended: ${data.message || 'Call has ended.'}`);
+                handleLiveCallEnded('ended', data.message);
+            }
+            else if (data.event === 'interrupted') {
+                clearLiveAudioQueue();
+                isAssistantProcessing = false;
+                logSip('Interruption acknowledged by AI.');
+                if (remoteAudio) {
+                    try {
+                        remoteAudio.pause();
+                        remoteAudio.currentTime = 0;
+                    } catch (e) {}
+                }
+                isAssistantSpeaking = false;
+                echoCooldownUntil = Date.now() + 300;
+                mutePreRollGain(false);
+                setVoiceState('listening', 'Interrupted. Listening (speak now)...');
+            }
+            else if (data.event === 'error') {
+                isAssistantProcessing = false;
+                const errMsg = String(data.message || '');
+                if (errMsg.toLowerCase().includes('already ended')) {
+                    clearLiveAudioQueue();
+                    handleLiveCallEnded('ended', 'This call session has already ended.');
+                    return;
+                }
+                logSip(`Server error: ${errMsg}`);
+                setVoiceState('error', `Server processing error: ${errMsg}`);
+            }
+        }
+
+        function handleLiveCallEnded(reason, message) {
+            clearLiveAudioQueue();
+            isLiveCallActive = false;
+            isAssistantSpeaking = false;
+            isAssistantProcessing = false;
+            isUserSpeaking = false;
+
+            if (reason === 'escalated') {
+                logSip('Call transferred to front desk. Live audio session closed.');
+                setVoiceState('listening', 'Call transferred to front desk. Live voice session closed.');
+                updateLiveCallStatus('TRANSFERRED', 'badge-warning');
+            } else {
+                logSip(message || 'Call session ended.');
+                setVoiceState('listening', message || 'Call ended.');
+                updateLiveCallStatus('ENDED', 'badge-gray');
+            }
+
+            // Immediately stop audio capture and clean up resources
+            if (speechDetectionInterval) {
+                clearInterval(speechDetectionInterval);
+                speechDetectionInterval = null;
+            }
+            if (liveRecorder && liveRecorder.state !== 'inactive') {
+                try { liveRecorder.stop(); } catch (e) {}
+            }
+            if (liveStream) {
+                liveStream.getTracks().forEach(t => t.stop());
+                liveStream = null;
+            }
+            if (livePreRollStream) {
+                try { livePreRollStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+                livePreRollStream = null;
+            }
+            if (livePreRollGain) {
+                try { livePreRollGain.disconnect(); } catch (e) {}
+                livePreRollGain = null;
+            }
+            if (livePreRollDelay) {
+                try { livePreRollDelay.disconnect(); } catch (e) {}
+                livePreRollDelay = null;
+            }
+            if (livePreRollDest) {
+                try { livePreRollDest.disconnect(); } catch (e) {}
+                livePreRollDest = null;
+            }
+            if (liveAudioContext) {
+                try { liveAudioContext.close(); } catch (e) {}
+                liveAudioContext = null;
+            }
+
+            if (liveWs && (liveWs.readyState === WebSocket.OPEN || liveWs.readyState === WebSocket.CONNECTING)) {
+                try { liveWs.close(); } catch (e) {}
+            }
+
+            const hangupBtn = document.getElementById('btn-sip-hangup');
+            const interruptBtn = document.getElementById('btn-live-interrupt');
+            const micIndicator = document.getElementById('live-mic-indicator');
+            const startBtn = document.getElementById('btn-sip-call');
+
+            if (hangupBtn) hangupBtn.classList.add('hidden');
+            if (interruptBtn) interruptBtn.classList.add('hidden');
+            if (micIndicator) micIndicator.classList.add('hidden');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.classList.remove('hidden');
+                startBtn.textContent = '📞 Start New Conversation';
+            }
+
+            const liveWaveformBars = document.querySelectorAll('#live-waveform-bars .live-bar');
+            if (liveWaveformBars) {
+                liveWaveformBars.forEach(b => b.style.height = '6px');
+            }
+        }
+
+        function interruptLiveVoiceCall() {
+            if (!isLiveCallActive) return;
+            logSip('Interruption triggered by user!');
+            const remoteAudio = document.getElementById('webrtc-remote-audio');
+            if (remoteAudio) {
+                try {
+                    remoteAudio.pause();
+                    remoteAudio.currentTime = 0;
+                } catch (e) {}
+            }
+            isAssistantSpeaking = false;
+            isAssistantProcessing = false;
+            echoCooldownUntil = Date.now() + 250;
+            mutePreRollGain(false);
+
+            if (liveWs && liveWs.readyState === WebSocket.OPEN) {
+                liveWs.send(JSON.stringify({ event: 'interrupt' }));
+            }
+            setVoiceState('listening', 'Interrupted. Speak now...');
+        }
+
+        function setupAudioVAD(stream) {
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                liveAudioContext = new AudioContext();
+                if (liveAudioContext.state === 'suspended') {
+                    liveAudioContext.resume().catch(() => {});
+                }
+                const source = liveAudioContext.createMediaStreamSource(stream);
+
+                // 1. Un-delayed real-time analyser for immediate speech detection
+                liveAnalyser = liveAudioContext.createAnalyser();
+                liveAnalyser.fftSize = 512;
+                liveAnalyser.smoothingTimeConstant = 0.25;
+                source.connect(liveAnalyser);
+
+                // 2. Rolling 400ms pre-roll delay line to preserve opening syllables
+                livePreRollGain = liveAudioContext.createGain();
+                livePreRollGain.gain.setValueAtTime(1.0, liveAudioContext.currentTime);
+                isPreRollMuted = false;
+
+                livePreRollDelay = liveAudioContext.createDelay(1.0);
+                livePreRollDelay.delayTime.setValueAtTime(VAD_CONFIG.preRollSeconds || 0.40, liveAudioContext.currentTime);
+
+                livePreRollDest = liveAudioContext.createMediaStreamDestination();
+
+                source.connect(livePreRollGain);
+                livePreRollGain.connect(livePreRollDelay);
+                livePreRollDelay.connect(livePreRollDest);
+
+                livePreRollStream = livePreRollDest.stream;
+
+                const bufferLength = liveAnalyser.frequencyBinCount; // 256
+                const dataArray = new Uint8Array(bufferLength);
+
+                const SPEECH_BIN_START = VAD_CONFIG.speechBinStart;
+                const SPEECH_BIN_END = Math.min(VAD_CONFIG.speechBinEnd, bufferLength);
+                const SPEECH_THRESHOLD = VAD_CONFIG.speechThreshold;
+                const SILENCE_THRESHOLD = VAD_CONFIG.silenceThreshold || 15;
+                const SILENCE_FRAMES_LIMIT = VAD_CONFIG.silenceFramesLimit;
+                const MAX_TURN_MS = VAD_CONFIG.maxTurnDurationMs || 8000;
+
+                let speechFrames = 0;
+                let silenceFrames = 0;
+
+                speechDetectionInterval = setInterval(() => {
+                    if (!isLiveCallActive) return;
+
+                    liveAnalyser.getByteFrequencyData(dataArray);
+
+                    let speechSum = 0;
+                    for (let i = SPEECH_BIN_START; i < SPEECH_BIN_END; i++) {
+                        speechSum += dataArray[i];
+                    }
+                    const speechVolume = speechSum / (SPEECH_BIN_END - SPEECH_BIN_START);
+
+                    // Update live waveform visualizer bars
+                    const liveWaveformBars = document.querySelectorAll('#live-waveform-bars .live-bar');
+                    if (liveWaveformBars && liveWaveformBars.length > 0) {
+                        const scaled = Math.min(24, Math.max(4, Math.floor(speechVolume * 0.4)));
+                        liveWaveformBars.forEach((bar, idx) => {
+                            const variance = Math.sin(Date.now() / 150 + idx) * 3;
+                            bar.style.height = `${Math.max(4, scaled + variance)}px`;
+                        });
+                    }
+
+                    // STRICT ENFORCEMENT: Never submit speech while AI is speaking or generating response
+                    if (isAssistantSpeaking || isAssistantProcessing) {
+                        mutePreRollGain(true);
+                        speechFrames = 0;
+                        silenceFrames = 0;
+                        return;
+                    }
+
+                    // Check echo cooldown: ensure residual room reverberation has dissipated
+                    if (Date.now() < echoCooldownUntil) {
+                        mutePreRollGain(true);
+                        speechFrames = 0;
+                        silenceFrames = 0;
+                        return;
+                    }
+
+                    // Assistant is NOT speaking and cooldown elapsed: un-mute pre-roll
+                    mutePreRollGain(false);
+
+                    // Safety limit: never allow a turn to runaway past max duration
+                    if (isUserSpeaking && (Date.now() - turnStartTime) > MAX_TURN_MS) {
+                        speechFrames = 0;
+                        silenceFrames = 0;
+                        stopTurnRecorder(true);
+                        return;
+                    }
+
+                    // Conversational speech detection with hysteresis
+                    if (speechVolume > SPEECH_THRESHOLD) {
+                        speechFrames++;
+                        silenceFrames = 0;
+
+                        if (!isUserSpeaking && speechFrames >= VAD_CONFIG.speechFramesTrigger) {
+                            startTurnRecorder();
+                        }
+                    } else if (speechVolume < SILENCE_THRESHOLD) {
+                        silenceFrames++;
+                        if (silenceFrames >= SILENCE_FRAMES_LIMIT) {
+                            speechFrames = 0;
+                            if (isUserSpeaking) {
+                                stopTurnRecorder(true);
+                            }
+                        }
+                    } else {
+                        // Intermediate band between SILENCE_THRESHOLD and SPEECH_THRESHOLD:
+                        // If user is currently speaking, count towards silence after pause
+                        if (isUserSpeaking) {
+                            silenceFrames++;
+                            if (silenceFrames >= SILENCE_FRAMES_LIMIT) {
+                                speechFrames = 0;
+                                stopTurnRecorder(true);
+                            }
+                        }
+                    }
+                }, VAD_CONFIG.intervalMs);
+            } catch (vadErr) {
+                console.warn('[LiveVoice] VAD setup note:', vadErr);
+            }
+        }
+
+        function startTurnRecorder() {
+            if (isUserSpeaking || isAssistantSpeaking || isAssistantProcessing || !isLiveCallActive || !liveStream) return;
+            isUserSpeaking = true;
+            liveLiveAudioChunks = [];
+            turnStartTime = Date.now();
+
+            setVoiceState('capturing');
+
+            try {
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                    ? 'audio/webm;codecs=opus'
+                    : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/wav');
+                
+                // Record from pre-roll delay line to preserve opening consonants and prevent initial clipping
+                const recordStream = livePreRollStream || liveStream;
+                liveRecorder = new MediaRecorder(recordStream, mimeType ? { mimeType } : undefined);
+
+                liveRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) {
+                        liveLiveAudioChunks.push(e.data);
+                    }
+                };
+
+                liveRecorder.onstop = async () => {
+                    // Do not submit speech if call is no longer active, or if assistant is speaking or processing
+                    if (!isLiveCallActive || isAssistantSpeaking || isAssistantProcessing) {
+                        liveLiveAudioChunks = [];
+                        isUserSpeaking = false;
+                        return;
+                    }
+
+                    if (liveLiveAudioChunks.length > 0 && isLiveCallActive && liveWs && liveWs.readyState === WebSocket.OPEN) {
+                        const audioBlob = new Blob(liveLiveAudioChunks, { type: liveRecorder.mimeType || 'audio/webm' });
+                        const turnDurationSec = ((Date.now() - turnStartTime) / 1000).toFixed(2);
+                        
+                        // Only dispatch turns with meaningful audio content (> 1200 bytes, allows short affirmations and responses)
+                        if (audioBlob.size >= 1200) {
+                            isAssistantProcessing = true;
+                            logSip(`Sending speech turn (${(audioBlob.size / 1024).toFixed(1)} KB, ~${turnDurationSec}s) to AI pipeline...`);
+                            setVoiceState('processing', `Processing speech (~${turnDurationSec}s)...`);
+                            const arrayBuffer = await audioBlob.arrayBuffer();
+                            liveWs.send(arrayBuffer);
+                        } else {
+                            isAssistantProcessing = false;
+                            logSip(`Audio turn too short (${audioBlob.size} bytes), ignoring.`);
+                            if (isLiveCallActive && !isAssistantSpeaking) {
+                                setVoiceState('listening');
+                            }
+                        }
+                    } else {
+                        isAssistantProcessing = false;
+                    }
+                    liveLiveAudioChunks = [];
+                    isUserSpeaking = false;
+                };
+
+                liveRecorder.start(50);
+            } catch (recErr) {
+                console.warn('[LiveVoice] Recorder error:', recErr);
+                isUserSpeaking = false;
+                setVoiceState('listening');
+            }
+        }
+
+        function stopTurnRecorder(flushTail = true) {
+            if (!liveRecorder || liveRecorder.state === 'inactive') {
+                isUserSpeaking = false;
+                return;
+            }
+
+            // Immediately signal Processing state so user knows speech capture has finished!
+            setVoiceState('processing');
+
+            if (flushTail) {
+                // Ensure the rolling pre-roll delay buffer (400ms) has fully flushed into the stream
+                const tailDrainMs = Math.max(180, Math.round((VAD_CONFIG.preRollSeconds || 0.40) * 1000));
+                setTimeout(() => {
+                    if (liveRecorder && liveRecorder.state !== 'inactive') {
+                        try {
+                            liveRecorder.stop();
+                        } catch (e) {
+                            console.warn(e);
+                        }
+                    }
+                }, tailDrainMs);
+            } else {
+                try {
+                    liveRecorder.stop();
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+        }
+
+        function endLiveVoiceCall() {
+            if (!isLiveCallActive) return;
+            logSip('Ending live voice call session...');
+            if (liveWs && liveWs.readyState === WebSocket.OPEN) {
+                try {
+                    liveWs.send(JSON.stringify({ event: 'end_call' }));
+                    liveWs.close();
+                } catch (e) {}
+            }
+            cleanupLiveVoiceCall();
+            logSip('Call ended cleanly. Database session updated.');
+            if (typeof loadAllCalls === 'function') loadAllCalls();
+            if (typeof loadCustomerCalls === 'function') loadCustomerCalls();
+        }
+
+        function cleanupLiveVoiceCall() {
+            isLiveCallActive = false;
+            isAssistantSpeaking = false;
+            isAssistantProcessing = false;
+            isUserSpeaking = false;
+            assistantPlaybackStartTime = 0;
+            echoCooldownUntil = 0;
+
+            if (speechDetectionInterval) {
+                clearInterval(speechDetectionInterval);
+                speechDetectionInterval = null;
+            }
+            if (liveRecorder && liveRecorder.state !== 'inactive') {
+                try { liveRecorder.stop(); } catch (e) {}
+            }
+            if (liveStream) {
+                liveStream.getTracks().forEach(t => t.stop());
+                liveStream = null;
+            }
+            if (livePreRollStream) {
+                try { livePreRollStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+                livePreRollStream = null;
+            }
+            if (livePreRollGain) {
+                try { livePreRollGain.disconnect(); } catch (e) {}
+                livePreRollGain = null;
+            }
+            if (livePreRollDelay) {
+                try { livePreRollDelay.disconnect(); } catch (e) {}
+                livePreRollDelay = null;
+            }
+            if (livePreRollDest) {
+                try { livePreRollDest.disconnect(); } catch (e) {}
+                livePreRollDest = null;
+            }
+            if (liveAudioContext) {
+                try { liveAudioContext.close(); } catch (e) {}
+                liveAudioContext = null;
+            }
+
+            const remoteAudio = document.getElementById('webrtc-remote-audio');
+            if (remoteAudio) {
+                try {
+                    remoteAudio.pause();
+                    remoteAudio.currentTime = 0;
+                } catch (e) {}
+            }
+
+            // Restore Pre-Call view and hide Active Call Panel
+            const preCallCard = document.getElementById('live-pre-call-card');
+            const activePanel = document.getElementById('live-call-active-panel') || document.getElementById('live-call-session-panel');
+            if (preCallCard) preCallCard.classList.remove('hidden');
+            if (activePanel) activePanel.classList.add('hidden');
+
+            const startBtn = document.getElementById('btn-sip-call');
+            const hangupBtn = document.getElementById('btn-sip-hangup');
+            const interruptBtn = document.getElementById('btn-live-interrupt');
+            const micIndicator = document.getElementById('live-mic-indicator');
+
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.classList.remove('hidden');
+                startBtn.textContent = '📞 Start Conversation';
+            }
+            if (hangupBtn) hangupBtn.classList.add('hidden');
+            if (interruptBtn) interruptBtn.classList.add('hidden');
+            if (micIndicator) micIndicator.classList.add('hidden');
+
+            updateWsStatus('WS: DISCONNECTED', 'badge-gray');
+            updateLiveCallStatus('IDLE', 'badge-gray');
+            setVoiceState('listening', 'Call Idle');
+            const liveWaveformBars = document.querySelectorAll('#live-waveform-bars .live-bar');
+            if (liveWaveformBars) {
+                liveWaveformBars.forEach(b => b.style.height = '6px');
+            }
+        }
+
+        function appendMessageToTranscriptBox(speaker, text) {
+            const box = document.getElementById('live-transcript-box');
+            if (!box) return;
+
+            // Remove placeholder text if present
+            if (box.children.length === 1 && box.firstElementChild && box.firstElementChild.style && box.firstElementChild.style.textAlign === 'center') {
+                box.innerHTML = '';
+            }
+
+            const isCust = speaker === 'customer';
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${isCust ? 'chat-customer' : 'chat-assistant'}`;
+            bubble.innerHTML = `
+                <div class="chat-speaker"><strong>${isCust ? 'Customer' : 'Assistant'}:</strong></div>
+                <div>${escapeHtml(text)}</div>
+            `;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+
+            const badge = document.getElementById('live-transcript-count');
+            if (badge) {
+                const count = box.querySelectorAll('.chat-bubble').length;
+                badge.textContent = `${count} message${count === 1 ? '' : 's'}`;
+            }
+        }
+
+        // Backward compatibility shims
+        function initSipClient() { startLiveVoiceCall(); }
+        function startWebRtcCall() { startLiveVoiceCall(); }
+        function hangupWebRtcCall() { endLiveVoiceCall(); }
+
+        checkAuth();
+    </script>
+</body>
+</html>

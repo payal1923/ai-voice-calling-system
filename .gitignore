@@ -1,0 +1,66 @@
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Audio files
+audio/
+*.wav
+*.mp3
+*.ogg
+*.m4a
+*.flac
+
+# Recordings
+recordings/
+
+# Transcripts
+transcripts/
+
+# Local databases and runtime logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Backup and temporary files
+*.bak
+*.bak.*
+backups/
+scratch/
+*.tmp
+
+# Python environments and tooling
+venv/
+ENV/
+.kilo/
+
+# Frontend dependencies
+node_modules/
+
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+
+# Preserve damaged Git metadata locally
+.git_corrupted_backup/
+
+
+# Downloaded AI model weights
+models/
+
+
+# Editor and task backup copies
+*.bak
+*.bak_*
+*.bak.*
+
