@@ -2565,6 +2565,9 @@ class ResponseService:
         t_lower = (transcript or "").lower()
         if any(w in t_lower for w in ["room service", "in-room dining", "in room dining", "delivered to my room"]):
             return None
+        # Exclude gym/fitness inquiries without pool cues so they route cleanly to _get_fitness_response
+        if any(w in t_lower for w in ["gym", "fitness", "workout", "exercise"]) and not any(w in t_lower for w in ["pool", "swimming"]):
+            return None
         has_pool_in_kb = bool(knowledge_context and any(w in knowledge_context.lower() for w in ["pool", "swimming"]))
         is_pool_query = any(w in t_lower for w in ["pool", "swimming"]) or (
             has_pool_in_kb and any(w in t_lower for w in ["it", "there", "close", "open", "hour", "hours", "time", "timing", "timings", "swim"])
