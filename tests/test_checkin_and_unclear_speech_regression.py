@@ -200,6 +200,34 @@ class TestCheckinAndUnclearSpeechRegression(unittest.TestCase):
         self.assertEqual(clean_dining, dining_ans)
         print("[PASS] Test 7: Legitimate relevant responses preserved intact.")
 
+    def test_08_checking_and_taking_time_acoustic_normalization(self):
+        """8. Verifies 'what is checking time', 'what is taking time', 'what is the take-in time' return 3:00 PM check-in time."""
+        acoustic_variants = [
+            "what is checking time",
+            "what is taking time",
+            "What is the taking time?",
+            "What is the take-in time?",
+            "check in timing",
+            "checking timing",
+        ]
+        for q in acoustic_variants:
+            kb = self.ks.get_relevant_knowledge(self.company_id, q)
+            self.assertTrue(bool(kb), f"Knowledge retrieval failed for '{q}'!")
+            resp = asyncio.run(self.rs.generate_response(
+                transcript=q,
+                conversation_context="",
+                system_instruction=self.sys_instruction,
+                knowledge_context=kb,
+            ))
+            print(f"\n[Test 8 Query]: '{q}' -> Response: '{resp}'")
+            self.assertTrue(
+                "3:00 pm" in resp.lower() or "15:00" in resp or "3:00" in resp,
+                f"Check-in time (3:00 PM) missing for acoustic variant '{q}'! Got: '{resp}'"
+            )
+            self.assertNotIn("can't assist with that", resp.lower())
+            self.assertNotIn("cannot assist with that", resp.lower())
+        print("[PASS] Test 8: Acoustic mistranscriptions ('checking time', 'taking time', 'take-in time') verified.")
+
 
 if __name__ == "__main__":
     unittest.main()

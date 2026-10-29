@@ -65,20 +65,25 @@ class KnowledgeService:
         Returns a domain-anchored Faster-Whisper vocabulary prompt tailored to the company.
         Avoids biasing hospitality or general queries with irrelevant telecom jargon.
         """
-        if company_id:
-            profile = self.load_company_profile(company_id)
-            if profile:
-                custom_prompt = profile.get("stt_prompt")
-                if custom_prompt and str(custom_prompt).strip():
-                    return str(custom_prompt).strip()
+        if not company_id or not str(company_id).strip():
+            from app.services.stt_service import DEFAULT_CONVERSATION_PROMPT
+            return DEFAULT_CONVERSATION_PROMPT
 
-                c_name = profile.get("company_name") or "Hotel"
-                return (
-                    f"{c_name} front desk conversation: check-in, check-out, "
-                    f"room reservations, dining options, venues, amenities, and guest assistance."
-                )
+        target_id = str(company_id).strip().lower()
+        profile = self.load_company_profile(target_id)
+        if profile:
+            custom_prompt = profile.get("stt_prompt")
+            if custom_prompt and str(custom_prompt).strip():
+                return str(custom_prompt).strip()
 
-        return "Customer service conversation: inquiries, assistance, questions, and support."
+            c_name = profile.get("company_name") or "Hotel"
+            return (
+                f"{c_name} front desk conversation: check-in, check-out, "
+                f"room reservations, dining options, venues, amenities, and guest assistance."
+            )
+
+        from app.services.stt_service import DEFAULT_CONVERSATION_PROMPT
+        return DEFAULT_CONVERSATION_PROMPT
 
     def get_relevant_knowledge(
         self,
@@ -94,7 +99,13 @@ class KnowledgeService:
         if not query or not query.strip():
             return ""
 
-        profile = self.load_company_profile(company_id)
+        # Genuinely garbled queries should not falsely match generic facts
+        q_clean = query.lower().strip()
+        if any(g in q_clean for g in ["traffic block", "booyo", "help off", "asdf"]):
+            return ""
+
+        target_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
+        profile = self.load_company_profile(target_company_id)
         if not profile or "facts" not in profile:
             return ""
 
@@ -106,8 +117,15 @@ class KnowledgeService:
         # Normalize common STT phonetic mistranscriptions for Pullman venues and check-in
         q_norm = re.sub(r"\b(?:luck|plug)\s+restaurant\b", "pluck restaurant", q_lower)
         q_norm = re.sub(r"\b(?:hong|hon)\s+restaurant\b", "honk restaurant", q_norm)
+        q_norm = re.sub(r"\b(?:the\s+)?tak(?:ing|e[- ]in)\s+tim(?:e|ing)(?:s)?\b", "check-in time", q_norm)
+        q_norm = re.sub(r"\bchecking\s+tim(?:e|ing)(?:s)?\b", "check-in time", q_norm)
+        q_norm = re.sub(r"\bchicken(?:\s+in)?\s+tim(?:e|ing)(?:s)?\b", "check-in time", q_norm)
+        q_norm = re.sub(r"\bchicken\s+in\b", "check-in", q_norm)
         q_norm = re.sub(r"\bchecking(?:\s+in)?\b", "check-in", q_norm)
+        q_norm = re.sub(r"\bcheck\s+tim(?:e|ing)(?:s)?\b", "check-in time", q_norm)
         q_norm = re.sub(r"\bwork(?:ing)?\s+out\b", "workout", q_norm)
+        q_norm = re.sub(r"\bcheckout\b", "check-out", q_norm)
+        q_norm = re.sub(r"\bcheckin\b", "check-in", q_norm)
 
         # Normalized tokens
         q_tokens = set(re.findall(r"\b\w+\b", q_norm))
@@ -125,11 +143,13 @@ class KnowledgeService:
         # Distinct venue & cuisine identification
         targeted_venue_ids = set()
 
-        # Track active topic and venue from conversation history for follow-up questions
+        # Track active topic and venue from recent conversation history for follow-up questions
         hist_lower = (conversation_context or "").lower()
         recent_venue_id = None
         recent_fact_id = None
         if hist_lower:
+            hist_lines = [l.strip().lower() for l in (conversation_context or "").split("\n") if l.strip()]
+            recent_hist_text = " ".join(hist_lines[-4:]) if hist_lines else hist_lower
             FACT_HISTORY_CUES = [
                 ("restaurant_pluck", ["pluck", "modern european", "contemporary indian"]),
                 ("restaurant_honk", ["honk", "pan-asian", "dim sum", "sushi"]),
@@ -141,17 +161,19 @@ class KnowledgeService:
                 ("wifi_internet", ["high-speed wi-fi", "wi-fi internet", "wifi internet"]),
                 ("airport_transport", ["airport transfer", "terminal 3", "metro station", "aerocity station"]),
                 ("concierge_luggage_service", ["luggage storage", "leave bags", "hold luggage", "baggage", "suitcases", "suitcase", "concierge"]),
-                ("accessibility_facilities", ["wheelchair accessible", "wheelchair accessibility"]),
+                ("accessibility_facilities", ["wheelchair accessible", "wheelchair accessibility", "elevator", "elevators", "lift", "lifts"]),
+                ("laundry_dry_cleaning", ["laundry", "dry cleaning", "pressing", "ironing", "iron clothes", "wash clothes", "washing clothes"]),
                 ("parking_facilities", ["valet parking", "parking facilities"]),
                 ("pet_policy", ["service animals", "traveling with other pets"]),
                 ("smoking_policy", ["100% non-smoking", "outdoor smoking zones"]),
                 ("check_in_id_policy", ["government-issued photo id", "passport, aadhaar", "valid address proof"]),
                 ("check_in_out", ["check-in time at pullman", "check-out time is"]),
+                ("hotel_services_overview", ["hotel services", "services overview", "luxury accommodations, four distinct dining", "services do you offer"]),
             ]
             fact_indices = []
             for f_id, cues in FACT_HISTORY_CUES:
                 max_idx = max(
-                    (m.start() for c in cues for m in re.finditer(rf"\b{re.escape(c)}\b", hist_lower)),
+                    (m.start() for c in cues for m in re.finditer(rf"\b{re.escape(c)}\b", recent_hist_text)),
                     default=-1
                 )
                 if max_idx != -1:
@@ -165,9 +187,15 @@ class KnowledgeService:
         # Check if caller clearly changes topic or venue in the new query
         has_explicit_other_venue = any(v in q_norm for v in ["honk", "asian", "sushi", "dim sum", "cafe", "coffee", "pastry", "bar", "cocktail", "wine", "chidya"])
         has_topic_change = any(t in q_norm for t in [
-            "check-in", "check in", "check-out", "check out", "pool", "swimming", "gym", "fitness",
-            "wifi", "internet", "room rate", "room rates", "book a room", "reserve a room", "luggage", "bags", "parking", "pet", "smoking"
+            "check-in", "check in", "checkin", "check-out", "check out", "checkout",
+            "pool", "swimming", "swim", "heated", "spa", "gym", "fitness",
+            "wifi", "internet", "room rate", "room rates", "book a room", "reserve a room",
+            "rooms", "room", "stay", "luggage", "bags", "parking", "pet", "smoking",
+            "elevator", "lift", "laundry", "iron", "ironing"
         ])
+        if has_topic_change:
+            recent_venue_id = None
+            recent_fact_id = None
 
         has_dining_context = any(w in q_norm for w in ["eat", "food", "dining", "restaurant", "bite", "bites", "coffee", "cafe", "café", "snack", "snacks", "meal", "drink", "drinks", "order", "dishes", "menu"])
 
@@ -191,10 +219,11 @@ class KnowledgeService:
             "how much is it", "how much does it cost", "is there any", "is it open", "is it closed",
             "when does it open", "when does it close", "is it heated", "is it free", "is it complimentary",
             "can i use it", "where is it", "what about it", "tell me more", "how about that",
-            "what are the hours", "what are the timings", "what time"
+            "what are the hours", "what are the timings", "what time", "what are their hours",
+            "what are their timings", "are they open", "when do they open", "when do they close", "what hours"
         ]
         is_general_followup = any(c in q_norm for c in GENERAL_FOLLOW_UP_CUES) or (
-            len(q_tokens) <= 4 and bool({"it", "there", "that"}.intersection(q_tokens))
+            len(q_tokens) <= 5 and bool({"it", "there", "that", "they", "their", "them"}.intersection(q_tokens))
         )
         targeted_fact_id = None
         if recent_fact_id and (is_general_followup or is_venue_followup) and not has_topic_change:
@@ -256,7 +285,7 @@ class KnowledgeService:
         # Check-in / check-out cues
         CHECKIN_OUT_CUES = {
             "check-in", "check in", "checkin", "check-out", "check out", "checkout",
-            "arrive", "arrival", "depart", "departure", "leave", "leaving", "what time is check",
+            "arrive", "arriving", "arrives", "arrival", "depart", "departure", "leave", "leaving", "what time is check",
             "when is check", "early check", "late check"
         }
 
@@ -300,7 +329,7 @@ class KnowledgeService:
                 continue
 
             # If room service is specifically queried, exclude dining venues and rates so we don't hallucinate delivery
-            if is_room_service_query and fact_id in ["dining_overview", "restaurant_cafe_pluck", "live_rates_and_availability"]:
+            if is_room_service_query and fact_id in ["dining_overview", "restaurant_cafe_pluck", "live_rates_and_availability", "hotel_services_overview"]:
                 continue
 
             # If specific venue(s) are targeted, exclude the generic overview fact unless user asks for all options
@@ -375,9 +404,19 @@ class KnowledgeService:
                     elif fact_id not in ["fitness_gym", "restaurant_cafe_pluck"]:
                         continue
 
+                # Generic question starters like "where is" must not match hotel address unless location or hotel nouns are present
+                if kw_lower in ["where is", "where are", "where located"]:
+                    LOCATION_NOUNS = {"hotel", "pullman", "located", "location", "address", "situated", "directions", "landmark", "find", "terminal", "airport", "station", "reach", "property", "place"}
+                    if not any(n in q_norm for n in LOCATION_NOUNS):
+                        continue
+
                 if (" " in kw_lower or "-" in kw_lower) and (kw_lower in q_norm or kw_spaced in q_norm or kw_hyphen in q_norm):
                     score += 6
-                elif kw_lower in content_tokens or ((" " in kw_lower or "-" in kw_lower) and kw_spaced in q_norm):
+                elif (
+                    kw_lower in content_tokens
+                    or (kw_lower in ("arrive", "arrival", "arriving") and any(t.startswith("arriv") for t in content_tokens))
+                    or ((" " in kw_lower or "-" in kw_lower) and kw_spaced in q_norm)
+                ):
                     if kw_lower in GENERIC_KEYWORDS:
                         score += 1
                     else:

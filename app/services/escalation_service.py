@@ -5,12 +5,15 @@ from sqlalchemy.orm import Session, joinedload
 from app.database.models import HumanAssistanceRequest, Call, Customer, Message
 
 ESCALATION_KEYWORDS = [
-    r"\b(human|agent|operator|representative|person|executive|officer)\b",
-    r"\b(talk to (someone|a human|an agent|a person|a representative))\b",
-    r"\b(speak with (someone|a human|an agent|a person|a representative))\b",
-    r"\b(connect me|transfer me|customer care|helpdesk)\b",
-    r"\b(frustrated|angry|terrible|horrible|useless|stupid ai|waste of time)\b",
-    r"\b(you don't understand|you do not understand|not helpful|can't help)\b",
+    # Explicit conversational requests to talk to or connect with a human / agent / person / representative / operator
+    r"\b(?:talk to|speak with|speak to|connect (?:me )?to|transfer (?:me )?to|hand (?:me )?over to)\s+(?:a\s+|an\s+|the\s+)?(?:human|agent|operator|representative|person|someone|manager|supervisor|receptionist|front desk)\b",
+    r"\b(?:want|need|like)\s+(?:to\s+speak\s+(?:with|to)|to\s+talk\s+to)\s+(?:a\s+|an\s+|the\s+)?(?:human|agent|operator|representative|person|someone|manager|supervisor|receptionist)\b",
+    r"\b(?:need|want)\s+(?:an?\s+)?(?:human|agent|operator|representative|receptionist)\b",
+    r"\b(?:human\s+(?:agent|representative|operator|help|assistance)|live\s+(?:agent|person|representative|operator|support)|real\s+(?:person|human))\b",
+    r"\b(?:human\s+representative\s+please|agent\s+please|operator\s+please)\b",
+    r"\b(?:connect me|transfer me|customer care|helpdesk)\b",
+    r"\b(?:frustrated|angry|terrible|horrible|useless|stupid ai|waste of time)\b",
+    r"\b(?:you don't understand|you do not understand|not helpful|can't help|stop the ai)\b",
 ]
 
 
@@ -37,6 +40,7 @@ class EscalationService:
         language_selected: str = "en",
         notes: Optional[str] = None,
         status: str = "waiting",
+        mark_call_ended: bool = False,
     ) -> HumanAssistanceRequest:
         """Creates and persists an escalation in human_assistance_requests table."""
         call = db.query(Call).options(joinedload(Call.customer)).filter(Call.id == call_id).first()
@@ -65,7 +69,7 @@ class EscalationService:
             updated_at=now,
         )
         db.add(req)
-        if call:
+        if call and mark_call_ended:
             call.status = "ESCALATED"
             call.ended_at = now
         db.commit()

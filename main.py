@@ -72,11 +72,21 @@ async def warmup_services():
         print("[STARTUP] Warming STT inference...")
         warmup_sample = os.path.join("static", "waiting", "waiting_1.wav")
         if os.path.exists(warmup_sample):
-            stt.transcribe(warmup_sample)
+            try:
+                stt.transcribe(warmup_sample)
+            except Exception as stt_err:
+                print(f"[STARTUP WARNING] STT warmup notice: {stt_err}")
         print("[STARTUP] STT warmup complete.")
 
-        # 2. Warm Piper TTS model
+        # 2. Warm Piper TTS model & ONNX inference session
+        print("[STARTUP] Loading and warming Piper TTS model...")
         tts = TTSService()
+        tts_warmup_path = os.path.join("recordings", "warmup_tts.wav")
+        try:
+            tts.synthesize("System ready.", tts_warmup_path, language="en")
+            print("[STARTUP] Piper TTS warmup complete.")
+        except Exception as tts_err:
+            print(f"[STARTUP WARNING] Piper TTS warmup notice: {tts_err}")
 
         # Pre-render static waiting audio clips if missing
         waiting_clips = {
@@ -104,18 +114,38 @@ async def warmup_services():
 
 @app.get("/")
 def home():
-    return FileResponse("frontend/index.html")
+    return FileResponse(
+        "frontend/index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/call")
 def public_voice_call():
     """Serves the original Voice Operations Hub website directly."""
-    return FileResponse("frontend/index.html")
+    return FileResponse(
+        "frontend/index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    from fastapi import Response
+    return Response(status_code=204)
 
 
 @app.post("/ai-test")

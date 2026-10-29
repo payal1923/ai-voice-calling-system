@@ -2209,16 +2209,25 @@
         let speechDetectionInterval = null;
         let liveActiveCallId = null;
 
+        // Turn latency measurement metrics
+        let speechStartTime = 0;
+        let speechEndTime = 0;
+        let lastSpeechFrameTime = 0;
+        let eosDetectedTime = 0;
+        let uploadStartTime = 0;
+        let firstAudioPlayTimeForTurn = 0;
+        let latencyLoggedForTurn = false;
+
         // Configurable Voice Activity Detection (VAD) & Pre-Roll Parameters
         const VAD_CONFIG = {
             intervalMs: 80,
             speechBinStart: 3,            // Skip 0-2 (<280Hz) to reject fan noise & 50/60Hz AC hum
             speechBinEnd: 36,             // Vocal formants up to ~3.4kHz
-            speechThreshold: 22,          // Real voice vocal energy threshold (clear voice is 28-80)
-            silenceThreshold: 18,         // Hysteresis silence cutoff threshold (calibrated above ambient fan hum)
+            speechThreshold: 20,          // Vocal energy threshold (clear voice is 25-90)
+            silenceThreshold: 16,         // Hysteresis silence cutoff threshold
             speechFramesTrigger: 1,       // 1 * 80ms = 80ms fast trigger to prevent losing initial consonants
-            silenceFramesLimit: 14,       // 14 * 80ms = ~1.12s natural conversational pause threshold (prevents mid-sentence cuts)
-            maxTurnDurationMs: 15000,     // Generous 15s limit: prevents cutting off detailed caller questions
+            silenceFramesLimit: 7,        // 7 * 80ms = 560ms natural conversational pause threshold
+            maxTurnDurationMs: 12000,     // 12s maximum turn duration
             preRollSeconds: 0.40,         // Pre-roll duration
         };
 
@@ -2345,10 +2354,10 @@
             if (!livePreRollGain || !liveAudioContext) return;
             try {
                 if (mute && !isPreRollMuted) {
-                    livePreRollGain.gain.setValueAtTime(0, liveAudioContext.currentTime);
+                    livePreRollGain.gain.setTargetAtTime(0, liveAudioContext.currentTime, 0.015);
                     isPreRollMuted = true;
                 } else if (!mute && isPreRollMuted) {
-                    livePreRollGain.gain.setValueAtTime(1.0, liveAudioContext.currentTime);
+                    livePreRollGain.gain.setTargetAtTime(1.0, liveAudioContext.currentTime, 0.02);
                     isPreRollMuted = false;
                 }
             } catch (e) {}
@@ -2358,6 +2367,21 @@
             if (isLiveCallActive) {
                 logSip('Live voice call is already active.');
                 return;
+            }
+
+            logSip('[STAGE 1] Live-call button clicked at ' + new Date().toISOString());
+
+            // 1. Initialize AudioContext synchronously while user gesture is active (BEFORE any await!)
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!liveAudioContext || liveAudioContext.state === 'closed') {
+                    liveAudioContext = new AudioContext();
+                }
+                if (liveAudioContext.state === 'suspended') {
+                    liveAudioContext.resume().catch(e => console.warn('AudioContext resume gesture note:', e));
+                }
+            } catch (actxErr) {
+                console.warn('[LiveVoice] Synchronous AudioContext init note:', actxErr);
             }
 
             let token = authToken || localStorage.getItem('auth_token');
@@ -2416,7 +2440,20 @@
                         channelCount: 1,
                     }
                 });
-                logSip('Microphone access granted.');
+                logSip('[STAGE 2] Microphone permission granted.');
+
+                const audioTracks = liveStream.getAudioTracks();
+                if (audioTracks && audioTracks.length > 0) {
+                    const trk = audioTracks[0];
+                    const settings = trk.getSettings ? trk.getSettings() : {};
+                    logSip(`[STAGE 3] Microphone: "${trk.label || 'Default'}" (sampleRate: ${settings.sampleRate || 'auto'}Hz, live: ${trk.readyState}, enabled: ${trk.enabled}, muted: ${trk.muted})`);
+                    if (trk.muted) {
+                        logSip('[MIC ERROR] Hardware or OS reports microphone is MUTED! Check Windows mic privacy settings or mute switch.');
+                    }
+                    trk.onmute = () => logSip('[MIC ALERT] Microphone hardware or Windows privacy muted the track!');
+                    trk.onunmute = () => logSip('[MIC ALERT] Microphone unmuted.');
+                    trk.onended = () => logSip('[MIC ALERT] Microphone track ended unexpectedly.');
+                }
 
                 // Switch UI from Pre-Call Card to Active Call Panel
                 const preCallCard = document.getElementById('live-pre-call-card');
@@ -2429,9 +2466,9 @@
                 const wsProto = (parsedBase.protocol === 'https:' || window.location.protocol === 'https:') ? 'wss:' : 'ws:';
                 const host = parsedBase.host || window.location.host || 'localhost:8000';
 
-                // Optional company_id parameter from current page URL
+                // Company parameter (defaults to pullman_aerocity if omitted)
                 const pageUrlParams = new URLSearchParams(window.location.search);
-                const companyId = (pageUrlParams.get('company_id') || '').trim();
+                const companyId = (pageUrlParams.get('company_id') || 'pullman_aerocity').trim();
                 const companyQuery = companyId ? `&company_id=${encodeURIComponent(companyId)}` : '';
 
                 const wsUrl = `${wsProto}//${host}/api/ws/live-call?token=${encodeURIComponent(token)}${customerId ? '&customer_id=' + encodeURIComponent(customerId) : ''}${companyQuery}`;
@@ -2505,12 +2542,20 @@
         let isLiveAudioPlaying = false;
         let hasStreamedChunksThisTurn = false;
         let pendingCallEndedReason = null;
+        let expectedLiveAudioChunkIndex = 0;
+        let chunkSequenceFallbackTimer = null;
+        let currentLiveTurnId = null;
 
         function clearLiveAudioQueue() {
             liveAudioQueue = [];
             isLiveAudioPlaying = false;
             hasStreamedChunksThisTurn = false;
             pendingCallEndedReason = null;
+            expectedLiveAudioChunkIndex = 0;
+            if (chunkSequenceFallbackTimer) {
+                clearTimeout(chunkSequenceFallbackTimer);
+                chunkSequenceFallbackTimer = null;
+            }
             const remoteAudio = document.getElementById('webrtc-remote-audio');
             if (remoteAudio) {
                 try {
@@ -2534,20 +2579,49 @@
                         handleLiveCallEnded(reason);
                         return;
                     }
-                    echoCooldownUntil = Date.now() + 400;
+                    echoCooldownUntil = Date.now() + 350;
                     if (isLiveCallActive) {
                         setTimeout(() => {
-                            if (isLiveCallActive && !isAssistantSpeaking && !isLiveAudioPlaying) {
+                            if (isLiveCallActive && !isAssistantSpeaking && !isLiveAudioPlaying && !isAssistantProcessing) {
+                                logSip('Assistant playback completed, microphone resumed listening for next turn');
                                 mutePreRollGain(false);
                                 setVoiceState('listening');
                             }
-                        }, 400);
+                        }, 350);
                     }
                 }
                 return;
             }
 
-            const nextChunk = liveAudioQueue.shift();
+            // Ensure chunk ordering
+            liveAudioQueue.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+            // Audio Chunk Sequencing: Ensure chunk 0 plays before chunk 1
+            const readyIdx = liveAudioQueue.findIndex(c => c.chunkIndex === expectedLiveAudioChunkIndex);
+            if (readyIdx === -1 && liveAudioQueue[0].chunkIndex > expectedLiveAudioChunkIndex) {
+                // Wait briefly for the expected chunk in case of jitter
+                if (!chunkSequenceFallbackTimer) {
+                    chunkSequenceFallbackTimer = setTimeout(() => {
+                        chunkSequenceFallbackTimer = null;
+                        if (liveAudioQueue.length > 0 && liveAudioQueue[0].chunkIndex > expectedLiveAudioChunkIndex) {
+                            console.warn(`[LiveVoice] Audio chunk ${expectedLiveAudioChunkIndex} delayed, advancing to chunk ${liveAudioQueue[0].chunkIndex}`);
+                            expectedLiveAudioChunkIndex = liveAudioQueue[0].chunkIndex;
+                            playNextLiveAudioChunk();
+                        }
+                    }, 300);
+                }
+                return;
+            }
+
+            if (chunkSequenceFallbackTimer) {
+                clearTimeout(chunkSequenceFallbackTimer);
+                chunkSequenceFallbackTimer = null;
+            }
+
+            const targetIdx = readyIdx !== -1 ? readyIdx : 0;
+            const nextChunk = liveAudioQueue.splice(targetIdx, 1)[0];
+            expectedLiveAudioChunkIndex = Math.max(expectedLiveAudioChunkIndex, nextChunk.chunkIndex + 1);
+
             // Discard chunk if call ID changed
             if (nextChunk.callId !== liveActiveCallId) {
                 playNextLiveAudioChunk();
@@ -2558,6 +2632,41 @@
             isAssistantSpeaking = true;
             mutePreRollGain(true);
             setVoiceState('speaking');
+
+            if (!firstAudioPlayTimeForTurn) {
+                firstAudioPlayTimeForTurn = Date.now();
+            }
+
+            if (speechEndTime > 0 && !latencyLoggedForTurn) {
+                latencyLoggedForTurn = true;
+                const eosDelayMs = Math.max(0, eosDetectedTime - speechEndTime);
+                const turnSpeechDurSec = ((speechEndTime - speechStartTime) / 1000).toFixed(2);
+                const timeToFirstAudioFromUpload = ((firstAudioPlayTimeForTurn - uploadStartTime) / 1000).toFixed(2);
+                const totalTurnaroundSec = ((firstAudioPlayTimeForTurn - speechEndTime) / 1000).toFixed(2);
+
+                const t = nextChunk.timings || {};
+                const sttSec = t.stt_sec != null ? t.stt_sec : '-';
+                const llmTTFT = t.llm_ttft_sec != null ? t.llm_ttft_sec : '-';
+                const piperTTS = t.chunk_tts_sec != null ? t.chunk_tts_sec : '-';
+
+                const speechStartTimeStr = new Date(speechStartTime).toISOString().split('T')[1].slice(0, 12);
+                const speechEndTimeStr = new Date(speechEndTime).toISOString().split('T')[1].slice(0, 12);
+                const playStartTimeStr = new Date(firstAudioPlayTimeForTurn).toISOString().split('T')[1].slice(0, 12);
+
+                const latencyReport = 
+`⚡ [LATENCY METRICS]
+• Speech Start: ${speechStartTimeStr}
+• Speech End: ${speechEndTimeStr} (Spoken duration: ${turnSpeechDurSec}s)
+• End-of-Speech Detection Delay: ${eosDelayMs}ms
+• STT Duration: ${sttSec}s (Faster-Whisper base.en)
+• LLM Time to First Token (TTFT): ${llmTTFT}s
+• Piper TTS Chunk Generation: ${piperTTS}s
+• Time Until First Audio Played: ${timeToFirstAudioFromUpload}s
+• Total User-to-Agent Turnaround: ${totalTurnaroundSec}s (Agent started speaking at ${playStartTimeStr})`;
+
+                console.log(latencyReport);
+                logSip(latencyReport);
+            }
 
             remoteAudio.src = resolveAudioUrl(nextChunk.audioUrl);
             remoteAudio.load();
@@ -2583,6 +2692,16 @@
 
         function handleLiveVoiceEvent(data) {
             const remoteAudio = document.getElementById('webrtc-remote-audio');
+            if (data.event !== 'processing') {
+                if (processingWatchdogTimer) {
+                    clearTimeout(processingWatchdogTimer);
+                    processingWatchdogTimer = null;
+                }
+                if (processingTerminalTimeoutTimer) {
+                    clearTimeout(processingTerminalTimeoutTimer);
+                    processingTerminalTimeoutTimer = null;
+                }
+            }
 
             if (data.event === 'session_started') {
                 liveActiveCallId = data.call_id;
@@ -2603,6 +2722,11 @@
             else if (data.event === 'processing') {
                 isAssistantProcessing = true;
                 hasStreamedChunksThisTurn = false;
+                expectedLiveAudioChunkIndex = 0;
+                if (chunkSequenceFallbackTimer) {
+                    clearTimeout(chunkSequenceFallbackTimer);
+                    chunkSequenceFallbackTimer = null;
+                }
                 setVoiceState('processing', 'Finished capturing speech. Generating AI response...');
             }
             else if (data.event === 'assistant_chunk') {
@@ -2611,15 +2735,24 @@
                     return;
                 }
                 if (!data.audio_url) return;
+                if (data.turn_id) currentLiveTurnId = data.turn_id;
 
+                // Immediately stop and discard any pending/in-flight recording so playback bleed cannot be captured
+                abortAndDiscardUserRecording('assistant chunk arrived');
+
+                logSip(`[STAGE 15] Browser received assistant audio chunk ${data.chunk_index} ("${data.text || ''}") [Turn: ${data.turn_id || '-'}]`);
                 isAssistantProcessing = false;
                 hasStreamedChunksThisTurn = true;
+                isAssistantSpeaking = true;
+                mutePreRollGain(true);
 
                 liveAudioQueue.push({
                     chunkIndex: data.chunk_index,
+                    turnId: data.turn_id,
                     audioUrl: data.audio_url,
                     text: data.text || '',
-                    callId: data.call_id
+                    callId: data.call_id,
+                    timings: data.timings || {}
                 });
                 liveAudioQueue.sort((a, b) => a.chunkIndex - b.chunkIndex);
 
@@ -2629,6 +2762,8 @@
             }
             else if (data.event === 'assistant_response') {
                 isAssistantProcessing = false;
+                if (data.turn_id) currentLiveTurnId = data.turn_id;
+                abortAndDiscardUserRecording('assistant response arrived');
                 if (data.transcript) {
                     const durText = data.audio_duration ? ` (${data.audio_duration.toFixed(1)}s)` : '';
                     logSip(`User${durText}: "${data.transcript}"`);
@@ -2637,10 +2772,15 @@
                 logSip(`AI: "${data.response}"`);
                 appendMessageToTranscriptBox('assistant', data.response);
 
-                const isEnding = Boolean(data.session_ended || data.is_escalated);
+                if (data.timings) {
+                    const t = data.timings;
+                    logSip(`[STAGE 16] Turn Complete [Turn: ${data.turn_id || '-'}] | STT: ${t.stt_sec}s | LLM TTFT: ${t.llm_ttft_sec}s | LLM Total: ${t.llm_total_sec || '-'}s | Piper Chunk0: ${t.first_chunk_tts_sec || t.chunk_tts_sec || '-'}s | Total Turn: ${t.total_turn_sec}s`);
+                }
+
+                const isEnding = Boolean(data.session_ended);
 
                 if (isEnding) {
-                    // Cease recording immediately when call ends or transfers
+                    // Cease recording immediately when call ends
                     isLiveCallActive = false;
                     mutePreRollGain(true);
                     if (speechDetectionInterval) {
@@ -2651,6 +2791,8 @@
                         try { liveRecorder.stop(); } catch (e) {}
                     }
                     updateLiveCallStatus(data.is_escalated ? 'TRANSFERRED' : 'ENDED', data.is_escalated ? 'badge-warning' : 'badge-gray');
+                } else if (data.is_escalated) {
+                    updateLiveCallStatus('ASSISTANCE LOGGED', 'badge-warning');
                 }
 
                 if (hasStreamedChunksThisTurn) {
@@ -2662,8 +2804,9 @@
                             handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
                         }
                     } else if (!isLiveAudioPlaying && liveAudioQueue.length === 0) {
-                        echoCooldownUntil = Date.now() + 400;
+                        echoCooldownUntil = Date.now() + 350;
                         mutePreRollGain(false);
+                        logSip('Assistant playback completed, microphone resumed listening for next turn');
                         setVoiceState('listening');
                     }
                     return;
@@ -2675,6 +2818,7 @@
                     mutePreRollGain(true);
                     setVoiceState('speaking', isEnding ? (data.is_escalated ? 'Connecting to human representative...' : 'Call completed.') : undefined);
 
+                    logSip('Browser received assistant audio response, starting playback');
                     remoteAudio.src = resolveAudioUrl(data.audio_url);
                     remoteAudio.load();
                     const playPromise = remoteAudio.play();
@@ -2687,6 +2831,7 @@
                             if (isEnding) {
                                 handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
                             } else {
+                                logSip('Playback ended, microphone resumed listening for next turn');
                                 setVoiceState('listening');
                             }
                         });
@@ -2697,6 +2842,7 @@
                         if (isEnding) {
                             handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
                         } else {
+                            logSip('Playback ended on error, microphone resumed listening');
                             setVoiceState('listening');
                         }
                     };
@@ -2707,14 +2853,15 @@
                             handleLiveCallEnded(data.is_escalated ? 'escalated' : 'ended');
                             return;
                         }
-                        echoCooldownUntil = Date.now() + 400; // 400ms acoustic echo drain
+                        echoCooldownUntil = Date.now() + 350; // 350ms acoustic echo drain
                         if (isLiveCallActive) {
                             setTimeout(() => {
                                 if (isLiveCallActive && !isAssistantSpeaking) {
+                                    logSip('Assistant playback completed, microphone resumed listening for next turn');
                                     mutePreRollGain(false);
                                     setVoiceState('listening');
                                 }
-                            }, 400);
+                            }, 350);
                         }
                     };
                 } else {
@@ -2724,6 +2871,7 @@
                     } else {
                         echoCooldownUntil = Date.now() + 300;
                         mutePreRollGain(false);
+                        logSip('Assistant response delivered, microphone resumed listening for next turn');
                         setVoiceState('listening');
                     }
                 }
@@ -2753,6 +2901,15 @@
             }
             else if (data.event === 'error') {
                 isAssistantProcessing = false;
+                if (processingWatchdogTimer) {
+                    clearTimeout(processingWatchdogTimer);
+                    processingWatchdogTimer = null;
+                }
+                if (processingTerminalTimeoutTimer) {
+                    clearTimeout(processingTerminalTimeoutTimer);
+                    processingTerminalTimeoutTimer = null;
+                }
+                abortAndDiscardUserRecording('server error');
                 const errMsg = String(data.message || '');
                 if (errMsg.toLowerCase().includes('already ended')) {
                     clearLiveAudioQueue();
@@ -2766,6 +2923,15 @@
 
         function handleLiveCallEnded(reason, message) {
             clearLiveAudioQueue();
+            if (processingWatchdogTimer) {
+                clearTimeout(processingWatchdogTimer);
+                processingWatchdogTimer = null;
+            }
+            if (processingTerminalTimeoutTimer) {
+                clearTimeout(processingTerminalTimeoutTimer);
+                processingTerminalTimeoutTimer = null;
+            }
+            abortAndDiscardUserRecording('call ended');
             isLiveCallActive = false;
             isAssistantSpeaking = false;
             isAssistantProcessing = false;
@@ -2859,22 +3025,85 @@
             setVoiceState('listening', 'Interrupted. Speak now...');
         }
 
+        let isStoppingTurn = false;
+        let processingWatchdogTimer = null;
+        let processingTerminalTimeoutTimer = null;
+        let liveTurnSequenceId = 0;
+        let lastVADLogTime = 0;
+
+        function abortAndDiscardUserRecording(reason = '') {
+            isUserSpeaking = false;
+            speechFrames = 0;
+            silenceFrames = 0;
+            liveLiveAudioChunks = [];
+            if (liveRecorder && liveRecorder.state !== 'inactive') {
+                try {
+                    liveRecorder.onstop = null;
+                    liveRecorder.stop();
+                    if (reason) {
+                        logSip(`[LiveVoice] User recording stopped and discarded (${reason})`);
+                    }
+                } catch (e) {
+                    console.warn('[LiveVoice] Error stopping recorder on abort:', e);
+                }
+            }
+        }
+
         function setupAudioVAD(stream) {
             try {
+                if (speechDetectionInterval) {
+                    clearInterval(speechDetectionInterval);
+                    speechDetectionInterval = null;
+                }
+
                 window.AudioContext = window.AudioContext || window.webkitAudioContext;
-                liveAudioContext = new AudioContext();
+                if (!liveAudioContext || liveAudioContext.state === 'closed') {
+                    liveAudioContext = new AudioContext();
+                }
                 if (liveAudioContext.state === 'suspended') {
                     liveAudioContext.resume().catch(() => {});
                 }
-                const source = liveAudioContext.createMediaStreamSource(stream);
 
-                // 1. Un-delayed real-time analyser for immediate speech detection
+                // Prevent V8 Garbage Collection bug in Chrome by anchoring MediaStreamAudioSourceNode on window
+                if (window.liveAudioSource) {
+                    try { window.liveAudioSource.disconnect(); } catch (e) {}
+                }
+                window.liveAudioSource = liveAudioContext.createMediaStreamSource(stream);
+
+                // Real-time audio analyser for human vocal formant energy detection
                 liveAnalyser = liveAudioContext.createAnalyser();
                 liveAnalyser.fftSize = 512;
                 liveAnalyser.smoothingTimeConstant = 0.25;
-                source.connect(liveAnalyser);
+                window.liveAudioSource.connect(liveAnalyser);
 
-                // 2. Rolling 400ms pre-roll delay line to preserve opening syllables
+                // Prevent Blink audio rendering starvation: connect through a silent gain node to destination
+                if (!window.liveSilentGain) {
+                    window.liveSilentGain = liveAudioContext.createGain();
+                    window.liveSilentGain.gain.value = 0.0;
+                }
+                try {
+                    liveAnalyser.connect(window.liveSilentGain);
+                    window.liveSilentGain.connect(liveAudioContext.destination);
+                } catch (e) {}
+
+                // Rolling 400ms pre-roll delay line to preserve opening syllables
+                if (livePreRollStream) {
+                    try { livePreRollStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+                    livePreRollStream = null;
+                }
+                if (livePreRollGain) {
+                    try { livePreRollGain.disconnect(); } catch (e) {}
+                    livePreRollGain = null;
+                }
+                if (livePreRollDelay) {
+                    try { livePreRollDelay.disconnect(); } catch (e) {}
+                    livePreRollDelay = null;
+                }
+                if (livePreRollDest) {
+                    try { livePreRollDest.disconnect(); } catch (e) {}
+                    livePreRollDest = null;
+                }
+
                 livePreRollGain = liveAudioContext.createGain();
                 livePreRollGain.gain.setValueAtTime(1.0, liveAudioContext.currentTime);
                 isPreRollMuted = false;
@@ -2884,122 +3113,278 @@
 
                 livePreRollDest = liveAudioContext.createMediaStreamDestination();
 
-                source.connect(livePreRollGain);
+                window.liveAudioSource.connect(livePreRollGain);
                 livePreRollGain.connect(livePreRollDelay);
                 livePreRollDelay.connect(livePreRollDest);
 
                 livePreRollStream = livePreRollDest.stream;
 
+                logSip(`[STAGE 4] AudioContext state: ${liveAudioContext.state}, sampleRate: ${liveAudioContext.sampleRate}Hz, Analyser & Pre-roll connected`);
+
                 const bufferLength = liveAnalyser.frequencyBinCount; // 256
-                const dataArray = new Uint8Array(bufferLength);
+                const freqBuffer = new Uint8Array(bufferLength);
+                const pcmBuffer = new Float32Array(liveAnalyser.fftSize); // 512 time-domain PCM samples
+                // Candidate B Hardened State-Machine VAD
+                const VAD_STATE = {
+                    WAITING: 0,
+                    ONSET_CONFIRMING: 1,
+                    ACTIVE_SPEECH: 2,
+                    IN_TURN_PAUSE: 3
+                };
+                let vadState = VAD_STATE.WAITING;
+                let ambientNoiseFloor = 20.0; // Sensitive initial baseline (never mutes soft speech)
+                let isFloorCalibrated = false;
+                let calibrationStepCount = 0;
 
-                const SPEECH_BIN_START = VAD_CONFIG.speechBinStart;
-                const SPEECH_BIN_END = Math.min(VAD_CONFIG.speechBinEnd, bufferLength);
-                const SPEECH_THRESHOLD = VAD_CONFIG.speechThreshold;
-                const SILENCE_THRESHOLD = VAD_CONFIG.silenceThreshold || 15;
-                const SILENCE_FRAMES_LIMIT = VAD_CONFIG.silenceFramesLimit;
-                const MAX_TURN_MS = VAD_CONFIG.maxTurnDurationMs || 8000;
+                let onsetCandidateFrames = 0;
+                let resumeCandidateFrames = 0;
+                let consecutiveSilenceFrames = 0;
+                let consecutiveIntermediateFrames = 0;
 
-                let speechFrames = 0;
-                let silenceFrames = 0;
+                const SILENCE_FRAMES_LIMIT = 12;       // 12 * 80ms = 960ms clean conversational pause
+                const INTERMEDIATE_FRAMES_LIMIT = 16;  // 16 * 80ms = 1280ms intermediate noise limit
+                const SILENCE_PEAK_LIMIT = 0.035;
+                const MAX_TURN_MS = 14000;             // 14 seconds max turn duration failsafe
 
                 speechDetectionInterval = setInterval(() => {
-                    if (!isLiveCallActive) return;
+                    if (!isLiveCallActive || !liveAnalyser) return;
 
-                    liveAnalyser.getByteFrequencyData(dataArray);
+                    // 1. Get frequency-domain and time-domain PCM audio data
+                    liveAnalyser.getByteFrequencyData(freqBuffer);
+                    liveAnalyser.getFloatTimeDomainData(pcmBuffer);
 
-                    let speechSum = 0;
-                    for (let i = SPEECH_BIN_START; i < SPEECH_BIN_END; i++) {
-                        speechSum += dataArray[i];
+                    // 2. Calculate true time-domain Peak and RMS amplitude
+                    let peak = 0;
+                    let sumSq = 0;
+                    for (let i = 0; i < pcmBuffer.length; i++) {
+                        const val = Math.abs(pcmBuffer[i]);
+                        if (val > peak) peak = val;
+                        sumSq += val * val;
                     }
-                    const speechVolume = speechSum / (SPEECH_BIN_END - SPEECH_BIN_START);
+                    const rms = Math.sqrt(sumSq / pcmBuffer.length);
 
-                    // Update live waveform visualizer bars
+                    // 3. Human vocal formant energy (bins 3..36 ~= 280Hz - 3400Hz)
+                    let speechSum = 0;
+                    for (let i = 3; i < 36; i++) {
+                        speechSum += freqBuffer[i];
+                    }
+                    const speechVolume = speechSum / 33;
+
+                    // 4. Update live waveform visualizer bars
                     const liveWaveformBars = document.querySelectorAll('#live-waveform-bars .live-bar');
                     if (liveWaveformBars && liveWaveformBars.length > 0) {
-                        const scaled = Math.min(24, Math.max(4, Math.floor(speechVolume * 0.4)));
+                        const numBars = liveWaveformBars.length;
                         liveWaveformBars.forEach((bar, idx) => {
-                            const variance = Math.sin(Date.now() / 150 + idx) * 3;
-                            bar.style.height = `${Math.max(4, scaled + variance)}px`;
+                            const binIndex = Math.min(bufferLength - 1, 3 + Math.floor(idx * (33 / numBars)));
+                            const binVal = freqBuffer[binIndex] || 0;
+                            const energy = Math.max(peak * 1.3, binVal / 120);
+                            const barHeight = Math.min(32, Math.max(4, Math.round(energy * 28) + 4));
+                            bar.style.height = `${barHeight}px`;
                         });
                     }
 
-                    // STRICT ENFORCEMENT: Never submit speech while AI is speaking or generating response
+                    // 5. Periodic diagnostic logging (every 2.5s while listening)
+                    if (Date.now() - lastVADLogTime > 2500) {
+                        lastVADLogTime = Date.now();
+                        if (!isAssistantSpeaking && !isAssistantProcessing) {
+                            logSip(`[STAGE 5] Mic level: Peak ${(peak * 100).toFixed(1)}%, RMS ${(rms * 100).toFixed(2)}%, FreqVol ${speechVolume.toFixed(1)} (floor: ${ambientNoiseFloor.toFixed(1)}, state: ${vadState})`);
+                        }
+                    }
+
+                    // STRICT ENFORCEMENT: Never capture or submit speech while AI is speaking or processing
                     if (isAssistantSpeaking || isAssistantProcessing) {
-                        mutePreRollGain(true);
-                        speechFrames = 0;
-                        silenceFrames = 0;
+                        vadState = VAD_STATE.WAITING;
+                        onsetCandidateFrames = 0;
+                        resumeCandidateFrames = 0;
+                        consecutiveSilenceFrames = 0;
+                        consecutiveIntermediateFrames = 0;
                         return;
                     }
 
                     // Check echo cooldown: ensure residual room reverberation has dissipated
                     if (Date.now() < echoCooldownUntil) {
-                        mutePreRollGain(true);
-                        speechFrames = 0;
-                        silenceFrames = 0;
+                        vadState = VAD_STATE.WAITING;
+                        onsetCandidateFrames = 0;
+                        resumeCandidateFrames = 0;
+                        consecutiveSilenceFrames = 0;
+                        consecutiveIntermediateFrames = 0;
                         return;
                     }
 
-                    // Assistant is NOT speaking and cooldown elapsed: un-mute pre-roll
-                    mutePreRollGain(false);
-
-                    // Safety limit: never allow a turn to runaway past max duration
+                    // Safety limit: prevent turns from running away indefinitely (evaluated at top of active frame)
                     if (isUserSpeaking && (Date.now() - turnStartTime) > MAX_TURN_MS) {
-                        speechFrames = 0;
-                        silenceFrames = 0;
-                        stopTurnRecorder(true);
+                        logSip(`[VAD] Maximum turn limit reached (${MAX_TURN_MS/1000}s). Finalizing turn.`);
+                        vadState = VAD_STATE.WAITING;
+                        onsetCandidateFrames = 0;
+                        resumeCandidateFrames = 0;
+                        consecutiveSilenceFrames = 0;
+                        consecutiveIntermediateFrames = 0;
+                        speechEndTime = lastSpeechFrameTime || Date.now();
+                        stopTurnRecorder();
                         return;
                     }
 
-                    // Conversational speech detection with hysteresis
-                    if (speechVolume > SPEECH_THRESHOLD) {
-                        speechFrames++;
-                        silenceFrames = 0;
+                    // 6. Multi-domain ambient floor calibration & dynamic adaptive tracking
+                    // True ambient frame requires low amplitude AND absence of vocal formant energy
+                    const floor = Math.max(8.0, Math.min(120.0, ambientNoiseFloor));
+                    const isAmbientFrame = (peak < 0.030) && (rms < 0.008) && (speechVolume < Math.min(22.0, floor + 4.0));
 
-                        if (!isUserSpeaking && speechFrames >= VAD_CONFIG.speechFramesTrigger) {
-                            startTurnRecorder();
-                        }
-                    } else if (speechVolume < SILENCE_THRESHOLD) {
-                        silenceFrames++;
-                        if (silenceFrames >= SILENCE_FRAMES_LIMIT) {
-                            speechFrames = 0;
-                            if (isUserSpeaking) {
-                                stopTurnRecorder(true);
+                    if (!isFloorCalibrated) {
+                        if (isAmbientFrame && vadState === VAD_STATE.WAITING) {
+                            ambientNoiseFloor = Math.max(5.0, Math.min(100.0, speechVolume));
+                            isFloorCalibrated = true;
+                        } else if (calibrationStepCount >= 8) {
+                            if (isAmbientFrame) {
+                                ambientNoiseFloor = Math.max(5.0, Math.min(100.0, speechVolume));
                             }
+                            // If caller spoke immediately, retain default sensitive baseline 20.0
+                            isFloorCalibrated = true;
                         }
-                    } else {
-                        // Intermediate band between SILENCE_THRESHOLD and SPEECH_THRESHOLD:
-                        // If user is currently speaking, count towards silence after pause
-                        if (isUserSpeaking) {
-                            silenceFrames++;
-                            if (silenceFrames >= SILENCE_FRAMES_LIMIT) {
-                                speechFrames = 0;
-                                stopTurnRecorder(true);
+                        calibrationStepCount++;
+                    } else if (vadState === VAD_STATE.WAITING && isAmbientFrame) {
+                        if (speechVolume < ambientNoiseFloor) {
+                            ambientNoiseFloor = (ambientNoiseFloor * 0.90) + (speechVolume * 0.10);
+                        } else {
+                            ambientNoiseFloor = (ambientNoiseFloor * 0.96) + (speechVolume * 0.04);
+                        }
+                    }
+
+                    const freqThreshold = floor + 12.0;
+                    const freqSilenceThreshold = floor + 3.5;
+
+                    // 7. Gated Signal Detectors
+                    const hasFormantEnergy = (speechVolume >= freqThreshold);
+                    const hasSpeechAmplitude = (peak >= 0.035) && (rms >= 0.007);
+                    const hasVocalBurst = (peak >= 0.080 && rms >= 0.020 && speechVolume >= floor + 5.0);
+
+                    const isSpeechSignal = (hasFormantEnergy && hasSpeechAmplitude) || hasVocalBurst;
+                    const isSilenceSignal = (speechVolume < freqSilenceThreshold) && (peak < SILENCE_PEAK_LIMIT);
+
+                    // 8. State Machine Transitions
+                    if (vadState === VAD_STATE.WAITING) {
+                        if (isSpeechSignal) {
+                            onsetCandidateFrames = 1;
+                            vadState = VAD_STATE.ONSET_CONFIRMING;
+                        }
+                    } else if (vadState === VAD_STATE.ONSET_CONFIRMING) {
+                        if (isSpeechSignal) {
+                            onsetCandidateFrames++;
+                            if (onsetCandidateFrames >= 2) { // 160ms confirmed vocal onset
+                                vadState = VAD_STATE.ACTIVE_SPEECH;
+                                consecutiveSilenceFrames = 0;
+                                consecutiveIntermediateFrames = 0;
+                                resumeCandidateFrames = 0;
+                                isUserSpeaking = true;
+                                turnStartTime = Date.now();
+                                speechStartTime = Date.now();
+                                lastSpeechFrameTime = Date.now();
+                                firstAudioPlayTimeForTurn = 0;
+                                latencyLoggedForTurn = false;
+                                const timeStr = new Date(speechStartTime).toISOString().split('T')[1].slice(0, 12);
+                                logSip(`[STAGE 6] VAD speech-start detected at ${timeStr} (Peak: ${(peak * 100).toFixed(1)}%, RMS: ${(rms * 100).toFixed(2)}%, Vol: ${speechVolume.toFixed(1)} >= ${freqThreshold.toFixed(1)})`);
+                                startTurnRecorder();
+                            }
+                        } else {
+                            onsetCandidateFrames = 0;
+                            vadState = VAD_STATE.WAITING;
+                        }
+                    } else if (vadState === VAD_STATE.ACTIVE_SPEECH) {
+                        if (isSpeechSignal) {
+                            lastSpeechFrameTime = Date.now(); // Updated ONLY on confirmed speech!
+                            consecutiveSilenceFrames = 0;
+                            consecutiveIntermediateFrames = 0;
+                            resumeCandidateFrames = 0;
+                        } else if (isSilenceSignal) {
+                            consecutiveSilenceFrames = 1;
+                            consecutiveIntermediateFrames = 0;
+                            resumeCandidateFrames = 0;
+                            vadState = VAD_STATE.IN_TURN_PAUSE;
+                        } else {
+                            consecutiveSilenceFrames = 0;
+                            consecutiveIntermediateFrames = 1;
+                            resumeCandidateFrames = 0;
+                            vadState = VAD_STATE.IN_TURN_PAUSE;
+                        }
+                    } else if (vadState === VAD_STATE.IN_TURN_PAUSE) {
+                        if (isSpeechSignal) {
+                            // Gated continuation:
+                            if (consecutiveSilenceFrames <= 2 || (peak >= 0.090 && rms >= 0.022 && speechVolume >= freqThreshold + 5.0)) {
+                                vadState = VAD_STATE.ACTIVE_SPEECH;
+                                lastSpeechFrameTime = Date.now();
+                                consecutiveSilenceFrames = 0;
+                                consecutiveIntermediateFrames = 0;
+                                resumeCandidateFrames = 0;
+                            } else {
+                                resumeCandidateFrames++;
+                                if (resumeCandidateFrames >= 2) {
+                                    vadState = VAD_STATE.ACTIVE_SPEECH;
+                                    lastSpeechFrameTime = Date.now();
+                                    consecutiveSilenceFrames = 0;
+                                    consecutiveIntermediateFrames = 0;
+                                    resumeCandidateFrames = 0;
+                                }
+                            }
+                        } else if (isSilenceSignal) {
+                            resumeCandidateFrames = 0;
+                            consecutiveSilenceFrames++;
+                            consecutiveIntermediateFrames = 0;
+                            if (consecutiveSilenceFrames >= SILENCE_FRAMES_LIMIT) {
+                                speechEndTime = lastSpeechFrameTime || (Date.now() - (SILENCE_FRAMES_LIMIT * 80));
+                                eosDetectedTime = Date.now();
+                                const eosDelayMs = Math.max(0, eosDetectedTime - speechEndTime);
+                                const turnDur = ((speechEndTime - speechStartTime) / 1000).toFixed(2);
+                                logSip(`[STAGE 9] Speech-end detected (speech duration: ${turnDur}s, EOS detection delay: ${eosDelayMs}ms, silence frames: ${SILENCE_FRAMES_LIMIT})`);
+                                vadState = VAD_STATE.WAITING;
+                                consecutiveSilenceFrames = 0;
+                                consecutiveIntermediateFrames = 0;
+                                resumeCandidateFrames = 0;
+                                stopTurnRecorder();
+                            }
+                        } else {
+                            resumeCandidateFrames = 0;
+                            consecutiveIntermediateFrames++;
+                            if (consecutiveIntermediateFrames >= INTERMEDIATE_FRAMES_LIMIT) {
+                                speechEndTime = lastSpeechFrameTime || (Date.now() - (INTERMEDIATE_FRAMES_LIMIT * 80));
+                                eosDetectedTime = Date.now();
+                                const eosDelayMs = Math.max(0, eosDetectedTime - speechEndTime);
+                                const turnDur = ((speechEndTime - speechStartTime) / 1000).toFixed(2);
+                                logSip(`[STAGE 9] Speech-end detected (intermediate silence, duration: ${turnDur}s, EOS delay: ${eosDelayMs}ms, intermediate frames: ${INTERMEDIATE_FRAMES_LIMIT})`);
+                                vadState = VAD_STATE.WAITING;
+                                consecutiveSilenceFrames = 0;
+                                consecutiveIntermediateFrames = 0;
+                                resumeCandidateFrames = 0;
+                                stopTurnRecorder();
                             }
                         }
                     }
-                }, VAD_CONFIG.intervalMs);
+                }, 80);
             } catch (vadErr) {
                 console.warn('[LiveVoice] VAD setup note:', vadErr);
             }
         }
 
         function startTurnRecorder() {
-            if (isUserSpeaking || isAssistantSpeaking || isAssistantProcessing || !isLiveCallActive || !liveStream) return;
-            isUserSpeaking = true;
+            if (isAssistantSpeaking || isAssistantProcessing || !isLiveCallActive || !liveStream) return;
+            if (liveRecorder && liveRecorder.state === 'recording') return;
+
             liveLiveAudioChunks = [];
             turnStartTime = Date.now();
+            isUserSpeaking = true;
 
-            setVoiceState('capturing');
+            setVoiceState('capturing', 'Listening... Speak your question');
 
             try {
                 const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
                     ? 'audio/webm;codecs=opus'
                     : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/wav');
                 
-                // Record from pre-roll delay line to preserve opening consonants and prevent initial clipping
+                // Record from pre-roll delay stream to preserve opening syllables and prevent initial onset clipping
                 const recordStream = livePreRollStream || liveStream;
-                liveRecorder = new MediaRecorder(recordStream, mimeType ? { mimeType } : undefined);
+                const recorderOptions = { audioBitsPerSecond: 128000 };
+                if (mimeType) {
+                    recorderOptions.mimeType = mimeType;
+                }
+                liveRecorder = new MediaRecorder(recordStream, recorderOptions);
 
                 liveRecorder.ondataavailable = (e) => {
                     if (e.data && e.data.size > 0) {
@@ -3008,39 +3393,76 @@
                 };
 
                 liveRecorder.onstop = async () => {
-                    // Do not submit speech if call is no longer active, or if assistant is speaking or processing
                     if (!isLiveCallActive || isAssistantSpeaking || isAssistantProcessing) {
                         liveLiveAudioChunks = [];
                         isUserSpeaking = false;
                         return;
                     }
 
-                    if (liveLiveAudioChunks.length > 0 && isLiveCallActive && liveWs && liveWs.readyState === WebSocket.OPEN) {
+                    if (liveLiveAudioChunks.length > 0 && liveWs && liveWs.readyState === WebSocket.OPEN) {
                         const audioBlob = new Blob(liveLiveAudioChunks, { type: liveRecorder.mimeType || 'audio/webm' });
                         const turnDurationSec = ((Date.now() - turnStartTime) / 1000).toFixed(2);
                         
-                        // Only dispatch turns with meaningful audio content (> 1200 bytes, allows short affirmations and responses)
-                        if (audioBlob.size >= 1200) {
+                        if (audioBlob.size >= 400) {
+                            uploadStartTime = Date.now();
+                            firstAudioPlayTimeForTurn = 0;
+                            latencyLoggedForTurn = false;
                             isAssistantProcessing = true;
-                            logSip(`Sending speech turn (${(audioBlob.size / 1024).toFixed(1)} KB, ~${turnDurationSec}s) to AI pipeline...`);
-                            setVoiceState('processing', `Processing speech (~${turnDurationSec}s)...`);
+                            mutePreRollGain(true);
+                            liveTurnSequenceId++;
+                            const currentTurnSeq = liveTurnSequenceId;
+                            logSip(`[STAGE 10] Audio submitted to backend WebSocket (/api/ws/live-call, ${audioBlob.size} bytes, ~${turnDurationSec}s) [Turn #${currentTurnSeq}]`);
+                            setVoiceState('processing', `Processing question (~${turnDurationSec}s)...`);
+
+                            // Processing watchdog: log progress if response takes longer than expected,
+                            // but NEVER reactivate the microphone or trigger phantom recording while backend is processing.
+                            if (processingWatchdogTimer) {
+                                clearTimeout(processingWatchdogTimer);
+                                processingWatchdogTimer = null;
+                            }
+                            processingWatchdogTimer = setTimeout(() => {
+                                if (currentTurnSeq !== liveTurnSequenceId) return;
+                                if (isAssistantProcessing && isLiveCallActive && !isAssistantSpeaking) {
+                                    logSip(`[LiveVoice Status] Response generation still in progress (~${Math.round((Date.now() - uploadStartTime)/1000)}s elapsed). Keeping microphone muted...`);
+                                    setVoiceState('processing', 'Generating response, please hold on...');
+                                }
+                            }, 15000);
+
+                            if (processingTerminalTimeoutTimer) {
+                                clearTimeout(processingTerminalTimeoutTimer);
+                                processingTerminalTimeoutTimer = null;
+                            }
+                            processingTerminalTimeoutTimer = setTimeout(() => {
+                                if (currentTurnSeq !== liveTurnSequenceId) return;
+                                if (isAssistantProcessing && isLiveCallActive && !isAssistantSpeaking) {
+                                    logSip('[LiveVoice Timeout] No response from server after 60s. Resetting turn state safely without submitting audio.');
+                                    isAssistantProcessing = false;
+                                    abortAndDiscardUserRecording('turn timed out after 60s');
+                                    setVoiceState('listening', 'Response timed out. Please try asking again.');
+                                    mutePreRollGain(false);
+                                }
+                            }, 60000);
+
                             const arrayBuffer = await audioBlob.arrayBuffer();
                             liveWs.send(arrayBuffer);
                         } else {
-                            isAssistantProcessing = false;
-                            logSip(`Audio turn too short (${audioBlob.size} bytes), ignoring.`);
-                            if (isLiveCallActive && !isAssistantSpeaking) {
+                            if (!isAssistantProcessing && !isAssistantSpeaking && isLiveCallActive) {
+                                logSip(`Audio turn too short (${audioBlob.size} bytes), returning to listening.`);
                                 setVoiceState('listening');
                             }
                         }
                     } else {
-                        isAssistantProcessing = false;
+                        if (!isAssistantProcessing && !isAssistantSpeaking && isLiveCallActive) {
+                            setVoiceState('listening');
+                        }
                     }
                     liveLiveAudioChunks = [];
                     isUserSpeaking = false;
                 };
 
-                liveRecorder.start(50);
+                // Request chunks every 100ms
+                liveRecorder.start(100);
+                logSip(`[STAGE 7] MediaRecorder started, mimeType: ${liveRecorder.mimeType}, state: ${liveRecorder.state}`);
             } catch (recErr) {
                 console.warn('[LiveVoice] Recorder error:', recErr);
                 isUserSpeaking = false;
@@ -3048,33 +3470,20 @@
             }
         }
 
-        function stopTurnRecorder(flushTail = true) {
-            if (!liveRecorder || liveRecorder.state === 'inactive') {
+        function stopTurnRecorder() {
+            if (!liveRecorder || liveRecorder.state === 'inactive' || isStoppingTurn) {
                 isUserSpeaking = false;
                 return;
             }
+            isStoppingTurn = true;
+            setVoiceState('processing', 'Speech completed. Processing response...');
 
-            // Immediately signal Processing state so user knows speech capture has finished!
-            setVoiceState('processing');
-
-            if (flushTail) {
-                // Ensure the rolling pre-roll delay buffer (400ms) has fully flushed into the stream
-                const tailDrainMs = Math.max(180, Math.round((VAD_CONFIG.preRollSeconds || 0.40) * 1000));
-                setTimeout(() => {
-                    if (liveRecorder && liveRecorder.state !== 'inactive') {
-                        try {
-                            liveRecorder.stop();
-                        } catch (e) {
-                            console.warn(e);
-                        }
-                    }
-                }, tailDrainMs);
-            } else {
-                try {
-                    liveRecorder.stop();
-                } catch (e) {
-                    console.warn(e);
-                }
+            try {
+                liveRecorder.stop();
+            } catch (e) {
+                console.warn('[LiveVoice] Recorder stop note:', e);
+            } finally {
+                setTimeout(() => { isStoppingTurn = false; }, 300);
             }
         }
 
@@ -3094,6 +3503,15 @@
         }
 
         function cleanupLiveVoiceCall() {
+            if (processingWatchdogTimer) {
+                clearTimeout(processingWatchdogTimer);
+                processingWatchdogTimer = null;
+            }
+            if (processingTerminalTimeoutTimer) {
+                clearTimeout(processingTerminalTimeoutTimer);
+                processingTerminalTimeoutTimer = null;
+            }
+            abortAndDiscardUserRecording('cleanupLiveVoiceCall');
             isLiveCallActive = false;
             isAssistantSpeaking = false;
             isAssistantProcessing = false;

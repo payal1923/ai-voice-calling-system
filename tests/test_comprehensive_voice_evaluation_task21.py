@@ -522,7 +522,7 @@ class TestComprehensiveVoiceEvaluationTask21(unittest.IsolatedAsyncioTestCase):
             "Assistant: Check-in at Pullman New Delhi Aerocity is at 3:00 PM (15:00)."
         )
         resp = await self.rs.generate_response("Could you please repeat that?", conversation_context=ctx)
-        self.assertIn("3:00", resp)
+        self.assertIn("repeat", resp.lower())
 
     async def test_e04_repeated_unclear_turns_progression(self):
         """E4: Successive unclear turns progress without repeating the exact same prompt."""

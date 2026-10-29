@@ -94,17 +94,18 @@ class ConversationContextService:
 
         return t
 
-    def build_context(self, calls: List[Call]) -> str:
+    def build_context(self, calls: List[Call], exclude_transcript: Optional[str] = None) -> str:
         """
         Formats a list of Call objects (and their associated messages) into a clean,
         chronological textual context string suitable for LLM prompting.
-        Preserves genuine conversation context while preventing stale clarification questions
-        or audio artifacts from polluting subsequent turns.
+        Preserves genuine conversation context while preventing stale clarification questions,
+        the current in-flight question, or audio artifacts from polluting subsequent turns.
         """
         if not calls:
             return ""
 
         context_parts = []
+        exclude_norm = exclude_transcript.strip().lower() if exclude_transcript else None
 
         for index, call in enumerate(calls, start=1):
             if not call.messages:
@@ -116,8 +117,17 @@ class ConversationContextService:
                 key=lambda m: (m.timestamp if m.timestamp is not None else datetime.min, m.id or 0),
             )
 
+            # If exclude_transcript is provided, ignore the trailing message if it matches the current transcript
+            messages_to_process = list(sorted_messages)
+            if exclude_norm and messages_to_process:
+                last_msg = messages_to_process[-1]
+                if (last_msg.speaker or "").lower() == "customer":
+                    last_text_norm = (last_msg.text or "").strip().lower()
+                    if last_text_norm == exclude_norm or last_text_norm.strip("?!.") == exclude_norm.strip("?!."):
+                        messages_to_process.pop()
+
             valid_lines = []
-            for msg in sorted_messages:
+            for msg in messages_to_process:
                 speaker = (msg.speaker or "").lower()
                 cleaned_text = self._clean_history_message(speaker, msg.text)
                 if cleaned_text:

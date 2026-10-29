@@ -8,19 +8,19 @@
   },
   "system_instruction": "You are the AI Front Desk Concierge for Pullman New Delhi Aerocity. Assist guests with hotel information, check-in and check-out, dining, wellness facilities, and hotel policies. Keep responses concise (1-2 sentences), polite, and suitable for a voice call. Answer ONLY based on the approved hotel facts provided. If a requested detail, live room rate, or current availability is not in the facts, politely state that you do not have that live information and offer to connect the caller with the hotel front desk or reservations team. Do NOT invent prices, availability, or amenities.",
   "greeting_message": "Hello! Thank you for calling Pullman New Delhi Aerocity. How may I assist you with your stay or visit today?",
-  "stt_prompt": "Pullman New Delhi Aerocity hotel front desk conversation: check-in, check-out, room reservations, dining restaurants Pluck, Honk, Cafe Pluck, Chidya Ghar Bar, swimming pool timings, airport transfers, and guest amenities.",
+  "stt_prompt": "Pullman New Delhi Aerocity hotel customer service and front desk conversation: guest arriving at half past eleven in the evening, late arrival, check-in time 3:00 PM, check-out time 12:00 PM, room booking reservations, complimentary high-speed Wi-Fi internet access, Wi-Fi in room, Wi-Fi password, airport pickup, airport transportation for passengers with large suitcases, luggage storage, wake-up call, packed breakfast to take away, breakfast buffet, dining restaurants Pluck, Honk, Café Pluck, Chidya Ghar Bar, swimming pool, fitness gym, fresh towels in my room, extra towels, bath towels, fresh linen, extra pillow, blanket, bottled water, laundry, dry cleaning, pressing, shirts pressed, ironing clothes, housekeeping, and elevator directions.",
   "facts": [
     {
       "id": "check_in_out",
       "category": "reception",
-      "keywords": ["check in", "check-in", "check out", "check-out", "timing", "timings", "arrive", "arrival", "departure", "leave", "time"],
-      "fact": "Check-in time at Pullman New Delhi Aerocity is 3:00 PM (15:00) and check-out time is 12:00 PM (12:00). Early check-in or late check-out is subject to room availability upon request."
+      "keywords": ["check in", "check-in", "checkin", "check out", "check-out", "checkout", "checking", "checking time", "taking time", "take-in", "take-in time", "check-in time", "check-in timing", "check-in timings", "timing", "timings", "arrive", "arrival", "arriving", "late arrival", "evening arrival", "night arrival", "half past", "departure", "leave", "time"],
+      "fact": "Check-in time at Pullman New Delhi Aerocity is 3:00 PM (15:00) and check-out time is 12:00 PM (12:00). Front desk reception is staffed 24 hours daily to assist guests with check-in, including late evening arrivals. Early check-in or late check-out is subject to room availability upon request."
     },
     {
       "id": "check_in_id_policy",
       "category": "reception",
-      "keywords": ["id", "identity", "identification", "proof", "passport", "aadhaar", "license", "document", "documents", "mandatory", "pan", "pan card", "driving license", "voter id", "address proof", "verification"],
-      "fact": "All adult guests must present a valid government-issued photo ID with address at check-in (Passport, Aadhaar Card, Driving License, or Voter ID). PAN cards are not accepted as valid address proof."
+      "keywords": ["id", "identity", "identification", "proof", "passport", "aadhaar", "license", "document", "documents", "mandatory", "pan", "pan card", "driving license", "voter id", "address proof", "verification", "name", "reservation name", "different name", "guest name", "someone else", "another person", "booking name", "different person", "name mismatch", "checking in on behalf"],
+      "fact": "All adult guests must present a valid government-issued photo ID with address at check-in (Passport, Aadhaar Card, Driving License, or Voter ID). If the guest checking in is different from the primary reservation name, please notify our front desk or reservations team in advance so we can note their name on the booking for authorization."
     },
     {
       "id": "dining_overview",
@@ -55,7 +55,7 @@
     {
       "id": "wellness_spa_pool",
       "category": "wellness",
-      "keywords": ["spa", "massage", "salon", "pool", "swimming", "swimming pool", "swimming-pool", "swim", "wellness", "woo", "heated pool", "jacuzzi"],
+      "keywords": ["spa", "massage", "salon", "pool", "swimming", "swimming pool", "swimming-pool", "swim", "wellness", "woo", "heated", "heated pool", "jacuzzi"],
       "fact": "The hotel offers the luxurious Woo Wellness Spa & Salon for holistic therapies and treatments, as well as a heated outdoor swimming pool for relaxation."
     },
     {
@@ -71,9 +71,32 @@
       "fact": "High-speed Wi-Fi internet access is complimentary for all registered in-house guests throughout the guest rooms and public areas."
     },
     {
+      "id": "room_water_amenity",
+      "category": "amenities",
+      "keywords": ["water", "drinking water", "water bottle", "bottles of water", "bottle of water", "mineral water", "water in my room", "water in room", "water in guest room", "room water"],
+      "fact": "For drinking water or extra water in your room, please contact our front desk or housekeeping team directly, and our team will be pleased to assist you."
+    },
+    {
+      "id": "room_amenities_and_housekeeping",
+      "category": "amenities",
+      "keywords": [
+        "towel", "towels", "fresh towel", "fresh towels", "extra towel", "extra towels",
+        "pillow", "pillows", "extra pillow", "extra pillows",
+        "blanket", "blankets", "extra blanket", "extra blankets",
+        "housekeeping", "send housekeeping", "housekeeping service", "clean my room", "cleaning"
+      ],
+      "fact": "For fresh towels, extra pillows, blankets, or housekeeping assistance in your room, please contact our front desk or housekeeping team directly, and our team will be happy to assist you."
+    },
+    {
+      "id": "hotel_address_and_location",
+      "category": "location",
+      "keywords": ["location", "located", "where is", "where is the hotel", "where are you", "where are you located", "address", "hotel address", "what is your address", "postal address", "directions", "situated", "where located", "landmark", "find the hotel"],
+      "fact": "Pullman New Delhi Aerocity is located at Asset No 02, GMR Hospitality District, IGI Airport, Aerocity, New Delhi, Delhi 110037, India, approximately 4 to 5 kilometers from Terminal 3 and walking distance from Delhi Metro Aerocity station."
+    },
+    {
       "id": "airport_transport",
       "category": "transport",
-      "keywords": ["airport", "shuttle", "transfer", "cab", "taxi", "car", "distance", "terminal 3", "t3", "igi", "aerocity", "pick up", "airport drop", "location", "address", "directions", "reach", "get there", "metro", "metro station", "subway", "train", "walking distance"],
+      "keywords": ["airport", "shuttle", "transfer", "cab", "taxi", "car", "distance", "terminal 3", "t3", "igi", "aerocity", "pick up", "airport drop", "location", "located", "address", "directions", "reach", "get there", "metro", "metro station", "subway", "train", "walking distance"],
       "fact": "Pullman New Delhi Aerocity is located approximately 4 to 5 kilometers from Indira Gandhi International Airport Terminal 3 and is within walking distance from the Delhi Metro Aerocity station. Airport transfers and private car services can be arranged on request through the concierge desk."
     },
     {
@@ -85,7 +108,7 @@
     {
       "id": "accessibility_facilities",
       "category": "amenities",
-      "keywords": ["wheelchair", "accessible", "accessibility", "handicap", "disabled", "barrier free", "mobility"],
+      "keywords": ["wheelchair", "accessible", "accessibility", "handicap", "disabled", "barrier free", "mobility", "elevator", "elevators", "lift", "lifts"],
       "fact": "Pullman New Delhi Aerocity provides wheelchair accessibility throughout the property, including accessible entrances, elevators, and specially equipped guest rooms."
     },
     {
@@ -109,8 +132,56 @@
     {
       "id": "live_rates_and_availability",
       "category": "reservations",
-      "keywords": ["price", "prices", "cost", "rate", "rates", "tariff", "availability", "available", "vacant", "vacancy", "book", "booking", "reserve", "reservation", "room price", "how much"],
+      "keywords": [
+        "price", "prices", "cost", "rate", "rates", "tariff", "availability", "available", "vacant", "vacancy", "book", "booking", "reserve", "reservation", "room price", "how much",
+        "types of rooms", "types of room", "what types of rooms do you have", "what types of room do you have",
+        "room types", "room type", "what room categories are available", "room categories", "room category",
+        "room options", "what room options"
+      ],
       "fact": "Room rates and availability vary in real time based on stay dates, room type, and occupancy. Please contact hotel reservations or visit the official Accor website for live pricing and booking confirmation."
+    },
+    {
+      "id": "cancellation_modification_policy",
+      "category": "policies",
+      "keywords": ["cancel", "cancellation", "canceling", "cancelling", "modify", "modification", "refund", "refunds", "change dates", "cancellation policy", "cancel booking"],
+      "fact": "Reservation cancellation and modification policies vary by rate type and booking terms. Please refer to your booking confirmation or contact our reservations team directly for cancellation assistance."
+    },
+    {
+      "id": "breakfast_dining_hours",
+      "category": "dining",
+      "keywords": ["breakfast", "breakfast time", "breakfast timings", "morning buffet", "breakfast hours", "breakfast buffet", "morning breakfast"],
+      "fact": "Breakfast is served daily at Pluck restaurant from 6:30 AM to 10:30 AM on weekdays and until 11:00 AM on weekends, featuring an extensive international and Indian buffet spread."
+    },
+    {
+      "id": "laundry_dry_cleaning",
+      "category": "amenities",
+      "keywords": ["laundry", "dry cleaning", "dry-cleaning", "ironing", "iron", "ironed", "iron clothes", "ironing clothes", "press clothes", "pressing clothes", "press", "pressing", "pressed", "wash", "washing", "washed", "wash clothes", "washing clothes", "clothes washed", "clothes ironed", "clothes pressed"],
+      "fact": "Same-day professional laundry, dry cleaning, and pressing services are available for all in-house guests upon request through housekeeping."
+    },
+    {
+      "id": "hotel_services_overview",
+      "category": "amenities",
+      "keywords": [
+        "service", "services", "facilities", "what type of service", "what type of services",
+        "type of service", "type of services", "types of service", "types of services",
+        "what services", "what facilities", "services do you offer", "services do you provide",
+        "services offer", "services provide", "what do you offer", "amenities", "what amenities",
+        "hotel services", "guest services"
+      ],
+      "fact": "Pullman New Delhi Aerocity offers luxury accommodations, four distinct dining venues, a 24/7 fitness center, Woo Wellness Spa and heated outdoor pool, complimentary luggage storage, airport transfers, and valet parking."
+    },
+    {
+      "id": "hotel_overview",
+      "category": "overview",
+      "keywords": [
+        "tell me about your hotel", "tell me about the hotel",
+        "can you tell me about your hotel", "can you tell me about the hotel",
+        "about your hotel", "about the hotel",
+        "hotel overview", "overview of the hotel",
+        "tell me about pullman", "about pullman",
+        "describe your hotel", "describe the hotel"
+      ],
+      "fact": "Pullman New Delhi Aerocity is an upscale Accor hotel located in Aerocity near Indira Gandhi International Airport, featuring luxury accommodations, four distinct dining venues, a 24/7 fitness center, Woo Wellness Spa and heated outdoor pool, and airport transfers."
     }
   ]
 }

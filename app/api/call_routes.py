@@ -682,12 +682,13 @@ async def add_turn(
                 }
 
         # Normal English AI Conversation Pipeline Turn
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
         result = await voice_service.process_existing_turn(
             call_id=call_id,
             audio_path=temp_path,
             output_audio_path=output_path,
             db=db,
-            company_id=company_id,
+            company_id=effective_company_id,
         )
 
         filename = os.path.basename(output_path)
@@ -883,16 +884,16 @@ async def live_voice_call_websocket(
                     has_greeting = True
                     break
 
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
+
         if not has_greeting:
             greeting_msg = ENGLISH_GREETING_MESSAGE
             greeting_filename = "en_greeting.wav"
-            if company_id:
-                from app.services.knowledge_service import KnowledgeService
-                c_greeting = KnowledgeService().get_greeting(company_id)
-                if c_greeting:
-                    greeting_msg = c_greeting
-                    clean_comp = str(company_id).strip().lower()
-                    greeting_filename = f"greeting_{clean_comp}.wav"
+            from app.services.knowledge_service import KnowledgeService
+            c_greeting = KnowledgeService().get_greeting(effective_company_id)
+            if c_greeting:
+                greeting_msg = c_greeting
+                greeting_filename = f"greeting_{effective_company_id}.wav"
 
             try:
                 conversation_service.add_message(
@@ -953,7 +954,7 @@ async def live_voice_call_websocket(
                     elif event_type in ("end_call", "hangup", "stop"):
                         is_end_call = True
                     elif event_type in ("user_audio", "audio_turn", "audio_chunk"):
-                        b64_str = data.get("audio") or data.get("payload") or ""
+                        b64_str = data.get("audio") or data.get("payload") or data.get("audio_base64") or ""
                         if b64_str:
                             audio_data = base64.b64decode(b64_str)
                     elif event_type == "ping":
@@ -995,7 +996,7 @@ async def live_voice_call_websocket(
                     })
                     continue
 
-                if len(audio_data) < 1000:
+                if len(audio_data) < 400:
                     print(f"[LIVE CALL] Ignoring undersized audio chunk ({len(audio_data)} bytes) for Call #{call.id}")
                     continue
 
@@ -1012,7 +1013,7 @@ async def live_voice_call_websocket(
                 else:
                     in_ext = ".wav"
 
-                print(f"[LIVE CALL] Received speech turn ({len(audio_data)} bytes, format {in_ext}) for Call #{call.id}")
+                print(f"[STAGE 11] Backend received speech turn ({len(audio_data)} bytes, format {in_ext}) for Call #{call.id}", flush=True)
 
                 temp_input_path = os.path.join(RECORDINGS_DIR, f"live_in_{call.id}_{temp_suffix}{in_ext}")
                 temp_output_path = os.path.join(GENERATED_AUDIO_DIR, f"live_out_{call.id}_{temp_suffix}.wav")
@@ -1048,7 +1049,7 @@ async def live_voice_call_websocket(
                             audio_path=inp_path,
                             output_audio_path_prefix=out_path,
                             db=db,
-                            company_id=company_id,
+                            company_id=effective_company_id,
                         )
                         async for event in stream_gen:
                             # Verify client is still connected before sending

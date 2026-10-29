@@ -163,8 +163,10 @@ def test_continuous_audio_live_websocket_delivery():
             assert proc_msg["event"] == "processing"
             print(f"  [PASS] WebSocket acknowledged continuous audio turn ({proc_msg['status']})")
 
-            resp_msg = ws.receive_json()
-            assert resp_msg["event"] == "assistant_response"
+            while True:
+                resp_msg = ws.receive_json()
+                if resp_msg["event"] == "assistant_response":
+                    break
             transcript = resp_msg.get("transcript", "")
             print(f"  [PASS] Live WebSocket transcript with pre-roll: '{transcript}'")
 

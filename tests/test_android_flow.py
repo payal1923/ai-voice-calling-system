@@ -115,7 +115,10 @@ class TestPublicCallerAndAndroidFlow(unittest.TestCase):
             # Second event: initial assistant greeting
             greeting_msg = ws.receive_json()
             self.assertEqual(greeting_msg.get("event"), "assistant_response")
-            self.assertIn("AI voice assistant", greeting_msg.get("response", ""))
+            self.assertTrue(
+                "Pullman" in greeting_msg.get("response", "") or "AI voice assistant" in greeting_msg.get("response", ""),
+                f"Greeting unexpected: {greeting_msg}"
+            )
 
             # 3. Verify in database: Call was assigned to dedicated isolated customer record
             with SessionLocal() as db:
@@ -161,10 +164,11 @@ class TestPublicCallerAndAndroidFlow(unittest.TestCase):
                 processing_msg = ws.receive_json()
                 self.assertEqual(processing_msg.get("event"), "processing")
 
-                # Expect assistant response with audio URL
+                # Expect assistant response or chunk with audio URL
                 resp_msg = ws.receive_json()
-                self.assertEqual(resp_msg.get("event"), "assistant_response")
-                self.assertTrue(len(resp_msg.get("response", "")) > 0)
+                self.assertIn(resp_msg.get("event"), ["assistant_response", "assistant_chunk"])
+                resp_text = resp_msg.get("text", "") or resp_msg.get("response", "")
+                self.assertTrue(len(resp_text) > 0)
                 self.assertTrue(resp_msg.get("audio_url", "").startswith("/audio/"))
 
             ws.send_json({"event": "end_call"})

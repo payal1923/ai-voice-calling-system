@@ -269,7 +269,7 @@ class TestPullmanKnowledgePrototype(unittest.TestCase):
 
                 msg2 = ws.receive_json()
                 self.assertEqual(msg2["event"], "assistant_response")
-                self.assertIn("AI voice assistant", msg2["response"])
+                self.assertTrue("Pullman" in msg2["response"] or "AI voice assistant" in msg2["response"])
 
                 ws.send_json({"event": "end_call"})
         finally:

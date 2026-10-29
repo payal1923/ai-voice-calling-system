@@ -1,5 +1,7 @@
 import os
 import time
+import uuid
+import json
 import asyncio
 from typing import Optional
 from datetime import datetime, timezone
@@ -12,8 +14,8 @@ from app.services.conversation_context_service import ConversationContextService
 from app.services.requirement_service import RequirementService
 from app.services.escalation_service import EscalationService
 from app.services.knowledge_service import KnowledgeService
-from app.database.models import Requirement, Message
-from app.utils.audio_utils import convert_to_16k_mono_wav
+from app.database.models import Requirement, Message, Call
+from app.utils.audio_utils import convert_to_16k_mono_wav, trim_audio_silence
 
 
 class VoiceResponseService:
@@ -91,6 +93,12 @@ class VoiceResponseService:
     async def _update_requirements(self, db: Session, call_id: int, full_text: str, is_resolved: bool):
         """Extracts and persists customer requirements into requirements table with smart field preservation."""
         try:
+            # Check if Call exists before processing to avoid foreign key errors in transient/deleted sessions
+            call_exists = db.query(Call).filter(Call.id == call_id).first()
+            if not call_exists:
+                db.rollback()
+                return
+
             req_data = await self.requirement_service.extract_requirements(full_text, is_resolved=is_resolved)
             now = datetime.now(timezone.utc)
             req_record = db.query(Requirement).filter(Requirement.call_id == call_id).first()
@@ -118,6 +126,10 @@ class VoiceResponseService:
                 req_record.updated_at = now
             db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             print(f"Warning: Failed to update requirements for call {call_id}: {e}")
 
     async def process_existing_turn(
@@ -127,13 +139,17 @@ class VoiceResponseService:
         output_audio_path: str,
         db: Session,
         company_id: str = None,
+        turn_id: Optional[str] = None,
     ) -> dict:
         """
         Processes an additional voice turn for an already active call.
         Optimized pipeline: Transcribe -> LLM Response -> Immediate TTS Synthesis -> Return audio.
         Requirements are extracted asynchronously in the background.
+        Includes correlated turn_id.
         """
         total_start = time.perf_counter()
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
+        effective_turn_id = turn_id or f"turn_{call_id}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
 
         # 1-4. DB Retrieval & Context Building
         db_start = time.perf_counter()
@@ -146,11 +162,13 @@ class VoiceResponseService:
 
         # 5. Transcribe with Faster-Whisper
         stt_start = time.perf_counter()
-        stt_prompt = self.knowledge_service.get_stt_prompt(company_id) if hasattr(self.knowledge_service, "get_stt_prompt") else None
+        stt_prompt = self.knowledge_service.get_stt_prompt(effective_company_id) if hasattr(self.knowledge_service, "get_stt_prompt") else None
         stt_audio_path = convert_to_16k_mono_wav(audio_path)
+        trimmed_stt_path = trim_audio_silence(stt_audio_path)
+        effective_stt_path = trimmed_stt_path if trimmed_stt_path and os.path.exists(trimmed_stt_path) else stt_audio_path
         if hasattr(self.stt_service, "transcribe_with_info"):
             transcript, audio_duration = self.stt_service.transcribe_with_info(
-                stt_audio_path,
+                effective_stt_path,
                 initial_prompt=stt_prompt,
             )
         else:
@@ -180,6 +198,7 @@ class VoiceResponseService:
             tts_time = time.perf_counter() - tts_start
             total_time = time.perf_counter() - total_start
             return {
+                "turn_id": effective_turn_id,
                 "transcript": "",
                 "audio_duration": audio_duration,
                 "response": response_text,
@@ -212,15 +231,17 @@ class VoiceResponseService:
                 call_id=call.id,
                 reason=esc_reason,
                 language_selected=call.language or "en",
+                mark_call_ended=False,
             )
             response_text = (
-                "I completely understand. I am transferring you to a human representative right away. "
-                "Please stay on the line while we connect you."
+                "A live representative transfer is not available on this line. "
+                "I have registered an assistance request with our front desk team. "
+                "You may continue speaking with me, or contact the front desk directly for immediate assistance."
             )
             self.conversation_service.add_message(
                 db, call_id=call.id, speaker="assistant", text=response_text
             )
-            self.conversation_service.end_call(db, call.id, status="ESCALATED")
+            db.commit()
 
             tts_start = time.perf_counter()
             generated_audio_path = self.tts_service.synthesize(response_text, output_audio_path)
@@ -228,13 +249,14 @@ class VoiceResponseService:
             total_time = time.perf_counter() - total_start
 
             return {
+                "turn_id": effective_turn_id,
                 "transcript": transcript,
                 "audio_duration": audio_duration,
                 "response": response_text,
                 "audio_path": generated_audio_path,
                 "customer_id": customer.external_customer_id,
                 "call_id": call.id,
-                "call_status": "ESCALATED",
+                "call_status": "IN_PROGRESS",
                 "is_escalated": True,
                 "timings": {
                     "stt_sec": round(stt_time, 2),
@@ -257,14 +279,11 @@ class VoiceResponseService:
         llm_details = {}
         used_streaming = False
 
-        # Resolve optional company persona and knowledge context if company_id is provided
-        system_instruction = None
-        knowledge_context = None
-        if company_id:
-            system_instruction = self.knowledge_service.get_system_instruction(company_id)
-            knowledge_context = self.knowledge_service.get_relevant_knowledge(
-                company_id, transcript, conversation_context=history_context
-            )
+        # Resolve company persona and knowledge context (defaults to pullman_aerocity)
+        system_instruction = self.knowledge_service.get_system_instruction(effective_company_id)
+        knowledge_context = self.knowledge_service.get_relevant_knowledge(
+            effective_company_id, transcript, conversation_context=history_context
+        )
 
         if streaming_enabled:
             try:
@@ -343,6 +362,7 @@ class VoiceResponseService:
         )
 
         return {
+            "turn_id": effective_turn_id,
             "transcript": transcript,
             "audio_duration": audio_duration,
             "response": response_text,
@@ -374,6 +394,7 @@ class VoiceResponseService:
         output_audio_path_prefix: str,
         db: Session,
         company_id: Optional[str] = None,
+        turn_id: Optional[str] = None,
     ):
         """
         Sentence-level streaming turn processor:
@@ -383,12 +404,14 @@ class VoiceResponseService:
         4. Synthesizes Piper TTS audio for that sentence chunk immediately and yields an 'assistant_chunk'
            event over WebSocket so the frontend starts audio playback with minimum latency.
         5. Finally yields the complete 'assistant_response' event for conversation history and transcript display.
+        Includes correlated turn_id and structured audit trace logging.
         """
         import time
         import os
         import asyncio
 
         turn_start_at = time.perf_counter()
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
 
         call = self.conversation_service.get_call(db, call_id)
         if not call:
@@ -397,27 +420,25 @@ class VoiceResponseService:
             raise ValueError(f"Call with ID {call_id} has already ended or has been routed to human assistance.")
         customer = call.customer
 
+        effective_turn_id = turn_id or f"turn_{call.id}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
+        print(f"[TURN {effective_turn_id}] Starting streaming turn for Call #{call.id}", flush=True)
+
         # 1. Transcribe audio with Faster-Whisper using company-grounded STT prompt
         stt_start_at = time.perf_counter()
-        stt_prompt = self.knowledge_service.get_stt_prompt(company_id) if hasattr(self.knowledge_service, "get_stt_prompt") else None
+        stt_prompt = self.knowledge_service.get_stt_prompt(effective_company_id) if hasattr(self.knowledge_service, "get_stt_prompt") else None
         stt_audio_path = await asyncio.to_thread(convert_to_16k_mono_wav, audio_path)
+        trimmed_stt_path = await asyncio.to_thread(trim_audio_silence, stt_audio_path)
+        effective_stt_path = trimmed_stt_path if trimmed_stt_path and os.path.exists(trimmed_stt_path) else stt_audio_path
         transcript, audio_duration = await asyncio.to_thread(
             self.stt_service.transcribe_with_info,
-            stt_audio_path,
+            effective_stt_path,
             initial_prompt=stt_prompt,
         )
         stt_end_at = time.perf_counter()
         stt_time = stt_end_at - stt_start_at
 
         clean_transcript = (transcript or "").strip()
-        if not clean_transcript:
-            clean_transcript = "[Silence / No speech detected]"
-
-        # 2. Save customer message to DB
-        self.conversation_service.add_message(
-            db, call_id=call.id, speaker="customer", text=clean_transcript
-        )
-        db.commit()
+        print(f"[STAGE 12] [Turn {effective_turn_id}] Faster-Whisper transcribed in {stt_time:.2f}s -> \"{clean_transcript}\" (Duration: {audio_duration:.2f}s)", flush=True)
 
         out_dir = os.path.dirname(output_audio_path_prefix) or "."
         base_name = os.path.basename(output_audio_path_prefix)
@@ -425,7 +446,93 @@ class VoiceResponseService:
             base_name = base_name[:-4]
         os.makedirs(out_dir, exist_ok=True)
 
-        # 3. Check Escalation
+        # Handle empty speech / silence gracefully without hallucinating
+        if not clean_transcript or clean_transcript == "[Silence / No speech detected]":
+            empty_msg = "I didn't quite hear that. Please speak directly into your microphone or ask your question again."
+            print(f"[LIVE CALL] [Turn {effective_turn_id}] Empty speech / silence on Call #{call.id}. Returning polite retry prompt.")
+            self.conversation_service.add_message(
+                db, call_id=call.id, speaker="assistant", text=empty_msg
+            )
+            db.commit()
+
+            chunk_filename = f"{base_name}_chunk0.wav"
+            chunk_path = os.path.join(out_dir, chunk_filename)
+            await asyncio.to_thread(self.tts_service.synthesize, empty_msg, chunk_path, language="en")
+            now = time.perf_counter()
+            print(f"[STAGE 14] [Turn {effective_turn_id}] Piper TTS synthesized fallback chunk -> {chunk_filename}")
+            yield {
+                "event": "assistant_chunk",
+                "turn_id": effective_turn_id,
+                "call_id": call.id,
+                "chunk_index": 0,
+                "text": empty_msg,
+                "audio_url": f"/audio/{chunk_filename}",
+                "is_final": True,
+                "timings": {
+                    "stt_sec": round(stt_time, 3),
+                    "time_to_first_text_sec": round(now - turn_start_at, 3),
+                    "time_to_first_audio_sec": round(now - turn_start_at, 3),
+                },
+            }
+            yield {
+                "event": "assistant_response",
+                "turn_id": effective_turn_id,
+                "call_id": call.id,
+                "speaker": "assistant",
+                "transcript": "",
+                "audio_duration": audio_duration,
+                "response": empty_msg,
+                "audio_url": f"/audio/{chunk_filename}",
+                "chunks_count": 1,
+                "is_escalated": False,
+                "session_ended": False,
+                "call_status": call.status,
+                "empty_speech": True,
+                "timings": {
+                    "stt_sec": round(stt_time, 3),
+                    "time_to_first_text_sec": round(now - turn_start_at, 3),
+                    "time_to_first_audio_sec": round(now - turn_start_at, 3),
+                    "total_turn_sec": round(now - turn_start_at, 3),
+                },
+            }
+
+            turn_trace_record = {
+                "trace_type": "turn_audit",
+                "turn_id": effective_turn_id,
+                "call_id": call.id,
+                "company_id": effective_company_id,
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "audio": {"input_path": audio_path, "duration_sec": audio_duration},
+                "stt": {"clean_transcript": "", "stt_duration_sec": round(stt_time, 3)},
+                "retrieval": {"knowledge_context_chars": 0, "history_context_chars": 0},
+                "llm": {"full_response": empty_msg, "ttft_sec": 0.0, "ttfs_sec": 0.0, "total_llm_sec": 0.0},
+                "tts": {"chunks_synthesized": 1, "first_chunk_tts_sec": round(now - turn_start_at - stt_time, 3)},
+                "timings": {
+                    "stt_sec": round(stt_time, 3),
+                    "time_to_first_text_sec": round(now - turn_start_at, 3),
+                    "time_to_first_audio_sec": round(now - turn_start_at, 3),
+                    "total_turn_sec": round(now - turn_start_at, 3),
+                },
+                "status": {"is_resolved": False, "call_status": call.status, "is_escalated": False, "empty_speech": True},
+                "error": None,
+            }
+            print(f"[TURN TRACE] {json.dumps(turn_trace_record)}", flush=True)
+            return
+
+        # 2. Context & Knowledge retrieval (captured from prior conversation BEFORE saving current customer turn)
+        history_context = self.context_service.build_context([call], exclude_transcript=clean_transcript)
+        system_instruction = self.knowledge_service.get_system_instruction(effective_company_id)
+        knowledge_context = self.knowledge_service.get_relevant_knowledge(
+            effective_company_id, clean_transcript, conversation_context=history_context
+        )
+
+        # 3. Save customer message to DB
+        self.conversation_service.add_message(
+            db, call_id=call.id, speaker="customer", text=clean_transcript
+        )
+        db.commit()
+
+        # 4. Check Escalation
         should_esc, esc_reason = EscalationService.should_escalate(clean_transcript)
         if should_esc:
             EscalationService.create_escalation(
@@ -433,15 +540,16 @@ class VoiceResponseService:
                 call_id=call.id,
                 reason=esc_reason,
                 language_selected=call.language or "en",
+                mark_call_ended=False,
             )
             esc_response = (
-                "I completely understand. I am transferring you to a human representative right away. "
-                "Please stay on the line while we connect you."
+                "A live representative transfer is not available on this line. "
+                "I have registered an assistance request with our front desk team. "
+                "You may continue speaking with me, or contact the front desk directly for immediate assistance."
             )
             self.conversation_service.add_message(
                 db, call_id=call.id, speaker="assistant", text=esc_response
             )
-            self.conversation_service.end_call(db, call.id, status="ESCALATED")
             db.commit()
 
             esc_chunk_filename = f"{base_name}_chunk0.wav"
@@ -451,6 +559,7 @@ class VoiceResponseService:
             now = time.perf_counter()
             yield {
                 "event": "assistant_chunk",
+                "turn_id": effective_turn_id,
                 "call_id": call.id,
                 "chunk_index": 0,
                 "text": esc_response,
@@ -464,6 +573,7 @@ class VoiceResponseService:
             }
             yield {
                 "event": "assistant_response",
+                "turn_id": effective_turn_id,
                 "call_id": call.id,
                 "speaker": "assistant",
                 "transcript": clean_transcript,
@@ -472,8 +582,8 @@ class VoiceResponseService:
                 "audio_url": f"/audio/{esc_chunk_filename}",
                 "chunks_count": 1,
                 "is_escalated": True,
-                "session_ended": True,
-                "call_status": "ESCALATED",
+                "session_ended": False,
+                "call_status": "IN_PROGRESS",
                 "timings": {
                     "stt_sec": round(stt_time, 3),
                     "time_to_first_text_sec": round(now - turn_start_at, 3),
@@ -481,29 +591,45 @@ class VoiceResponseService:
                     "total_turn_sec": round(now - turn_start_at, 3),
                 },
             }
+
+            turn_trace_record = {
+                "trace_type": "turn_audit",
+                "turn_id": effective_turn_id,
+                "call_id": call.id,
+                "company_id": effective_company_id,
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "audio": {"input_path": audio_path, "duration_sec": audio_duration},
+                "stt": {"clean_transcript": clean_transcript, "stt_duration_sec": round(stt_time, 3)},
+                "retrieval": {"knowledge_context_chars": 0, "history_context_chars": 0},
+                "llm": {"full_response": esc_response, "ttft_sec": 0.0, "ttfs_sec": 0.0, "total_llm_sec": 0.0},
+                "tts": {"chunks_synthesized": 1, "first_chunk_tts_sec": round(now - turn_start_at - stt_time, 3)},
+                "timings": {
+                    "stt_sec": round(stt_time, 3),
+                    "time_to_first_text_sec": round(now - turn_start_at, 3),
+                    "time_to_first_audio_sec": round(now - turn_start_at, 3),
+                    "total_turn_sec": round(now - turn_start_at, 3),
+                },
+                "status": {"is_resolved": False, "call_status": "IN_PROGRESS", "is_escalated": True, "escalation_reason": esc_reason},
+                "error": None,
+            }
+            print(f"[TURN TRACE] {json.dumps(turn_trace_record)}", flush=True)
             return
 
-        # 4. Context & Knowledge retrieval
-        history_context = self.context_service.build_context([call])
-        system_instruction = None
-        knowledge_context = None
-        if company_id:
-            system_instruction = self.knowledge_service.get_system_instruction(company_id)
-            knowledge_context = self.knowledge_service.get_relevant_knowledge(
-                company_id, clean_transcript, conversation_context=history_context
-            )
-
         # 5. Sentence streaming generation and audio chunk synthesis
+        print(f"[STAGE 13] [Turn {effective_turn_id}] Ollama LLM generating response for Call #{call.id}...", flush=True)
+        llm_timings = {}
         sentence_gen = self.response_service.generate_response_stream_sentences(
             transcript=clean_transcript,
             conversation_context=history_context,
             system_instruction=system_instruction,
             knowledge_context=knowledge_context,
+            timings=llm_timings,
         )
 
         t_first_text = None
         t_first_audio = None
         chunk_index = 0
+        first_chunk_tts_dur = 0.0
         collected_sentences = []
 
         async for sentence in sentence_gen:
@@ -522,9 +648,12 @@ class VoiceResponseService:
             try:
                 await asyncio.to_thread(self.tts_service.synthesize, s_clean, chunk_path, language="en")
             except Exception as tts_err:
-                print(f"[STREAMING TTS ERROR] Failed to synthesize chunk {chunk_index}: {tts_err}")
+                print(f"[STREAMING TTS ERROR] [Turn {effective_turn_id}] Failed to synthesize chunk {chunk_index}: {tts_err}")
                 continue
             tts_dur = time.perf_counter() - tts_t0
+            if chunk_index == 0:
+                first_chunk_tts_dur = tts_dur
+            print(f"[STAGE 14] [Turn {effective_turn_id}] Piper TTS synthesized chunk {chunk_index} in {tts_dur:.2f}s -> \"{s_clean}\"", flush=True)
 
             now_audio = time.perf_counter()
             if t_first_audio is None:
@@ -534,6 +663,7 @@ class VoiceResponseService:
 
             yield {
                 "event": "assistant_chunk",
+                "turn_id": effective_turn_id,
                 "call_id": call.id,
                 "chunk_index": chunk_index,
                 "text": s_clean,
@@ -541,9 +671,11 @@ class VoiceResponseService:
                 "is_final": False,
                 "timings": {
                     "stt_sec": round(stt_time, 3),
+                    "llm_ttft_sec": round(llm_timings.get("llm_ttft", 0.0), 3),
+                    "llm_ttfs_sec": round(llm_timings.get("llm_ttfs", (t_first_text - turn_start_at) if t_first_text else 0.0), 3),
+                    "chunk_tts_sec": round(tts_dur, 3),
                     "time_to_first_text_sec": round(t_first_text - turn_start_at, 3),
                     "time_to_first_audio_sec": round(t_first_audio - turn_start_at, 3),
-                    "chunk_tts_sec": round(tts_dur, 3),
                 },
             }
             chunk_index += 1
@@ -585,13 +717,17 @@ class VoiceResponseService:
         first_chunk_file = f"{base_name}_chunk0.wav" if chunk_index > 0 else ""
 
         print(
-            f"[LIVE STREAMING SUMMARY] Call #{call.id} | Chunks: {chunk_index} | "
-            f"STT: {stt_time:.3f}s | TTFT: {(t_first_text - turn_start_at if t_first_text else 0.0):.3f}s | "
-            f"TTFA: {(t_first_audio - turn_start_at if t_first_audio else 0.0):.3f}s | Total: {total_time:.3f}s"
+            f"[LIVE STREAMING SUMMARY] Turn {effective_turn_id} | Call #{call.id} | Chunks: {chunk_index} | "
+            f"STT: {stt_time:.3f}s | LLM TTFT: {llm_timings.get('llm_ttft', 0.0):.3f}s | "
+            f"TTFS: {(t_first_text - turn_start_at if t_first_text else 0.0):.3f}s | "
+            f"TTS Chunk0: {first_chunk_tts_dur:.3f}s | "
+            f"TTFA: {(t_first_audio - turn_start_at if t_first_audio else 0.0):.3f}s | Total: {total_time:.3f}s",
+            flush=True,
         )
 
         yield {
             "event": "assistant_response",
+            "turn_id": effective_turn_id,
             "call_id": call.id,
             "speaker": "assistant",
             "transcript": clean_transcript,
@@ -604,11 +740,56 @@ class VoiceResponseService:
             "call_status": call_status,
             "timings": {
                 "stt_sec": round(stt_time, 3),
+                "llm_ttft_sec": round(llm_timings.get("llm_ttft", 0.0), 3),
+                "llm_ttfs_sec": round(llm_timings.get("llm_ttfs", (t_first_text - turn_start_at) if t_first_text else total_time), 3),
+                "llm_total_sec": round(llm_timings.get("llm_total", (t_first_text - turn_start_at) if t_first_text else total_time), 3),
+                "first_chunk_tts_sec": round(first_chunk_tts_dur, 3),
                 "time_to_first_text_sec": round((t_first_text - turn_start_at) if t_first_text else total_time, 3),
                 "time_to_first_audio_sec": round((t_first_audio - turn_start_at) if t_first_audio else total_time, 3),
                 "total_turn_sec": round(total_time, 3),
             },
         }
+
+        turn_trace_record = {
+            "trace_type": "turn_audit",
+            "turn_id": effective_turn_id,
+            "call_id": call.id,
+            "company_id": effective_company_id,
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "audio": {"input_path": audio_path, "duration_sec": audio_duration},
+            "stt": {"clean_transcript": clean_transcript, "stt_duration_sec": round(stt_time, 3)},
+            "retrieval": {
+                "system_instruction_chars": len(system_instruction or ""),
+                "knowledge_context_chars": len(knowledge_context or ""),
+                "history_context_chars": len(history_context or ""),
+            },
+            "llm": {
+                "full_response": full_response_text,
+                "ttft_sec": round(llm_timings.get("llm_ttft", 0.0), 3),
+                "ttfs_sec": round(llm_timings.get("llm_ttfs", (t_first_text - turn_start_at) if t_first_text else total_time), 3),
+                "total_llm_sec": round(llm_timings.get("llm_total", (t_first_text - turn_start_at) if t_first_text else total_time), 3),
+            },
+            "tts": {
+                "chunks_synthesized": chunk_index,
+                "first_chunk_tts_sec": round(first_chunk_tts_dur, 3),
+            },
+            "timings": {
+                "stt_sec": round(stt_time, 3),
+                "llm_ttft_sec": round(llm_timings.get("llm_ttft", 0.0), 3),
+                "llm_ttfs_sec": round(llm_timings.get("llm_ttfs", (t_first_text - turn_start_at) if t_first_text else total_time), 3),
+                "first_chunk_tts_sec": round(first_chunk_tts_dur, 3),
+                "time_to_first_text_sec": round((t_first_text - turn_start_at) if t_first_text else total_time, 3),
+                "time_to_first_audio_sec": round((t_first_audio - turn_start_at) if t_first_audio else total_time, 3),
+                "total_turn_sec": round(total_time, 3),
+            },
+            "status": {
+                "is_resolved": is_resolved,
+                "call_status": call_status,
+                "is_escalated": False,
+            },
+            "error": None,
+        }
+        print(f"[TURN TRACE] {json.dumps(turn_trace_record)}", flush=True)
 
     async def process_voice_turn(
         self,
@@ -618,6 +799,7 @@ class VoiceResponseService:
         db: Session,
         language: str = "en",
         company_id: str = None,
+        turn_id: Optional[str] = None,
     ) -> dict:
         """
         Processes a single-turn voice interaction with persistent database memory.
@@ -626,22 +808,26 @@ class VoiceResponseService:
 
         # a-d. Customer & Call creation + history context retrieval
         db_start = time.perf_counter()
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
         customer = self.conversation_service.get_or_create_customer(
             db, external_customer_id=external_customer_id
         )
         call = self.conversation_service.create_call(db, customer.id)
         call.language = language
         db.commit()
+        effective_turn_id = turn_id or f"turn_{call.id}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
         history_context = self.context_service.build_context([call])
         context_db_time = time.perf_counter() - db_start
 
         # e. Transcribe current audio
         stt_start = time.perf_counter()
-        stt_prompt = self.knowledge_service.get_stt_prompt(company_id) if hasattr(self.knowledge_service, "get_stt_prompt") else None
+        stt_prompt = self.knowledge_service.get_stt_prompt(effective_company_id) if hasattr(self.knowledge_service, "get_stt_prompt") else None
         stt_audio_path = convert_to_16k_mono_wav(audio_path)
+        trimmed_stt_path = trim_audio_silence(stt_audio_path)
+        effective_stt_path = trimmed_stt_path if trimmed_stt_path and os.path.exists(trimmed_stt_path) else stt_audio_path
         if hasattr(self.stt_service, "transcribe_with_info"):
             transcript, _ = self.stt_service.transcribe_with_info(
-                stt_audio_path,
+                effective_stt_path,
                 initial_prompt=stt_prompt,
             )
         else:
@@ -668,6 +854,7 @@ class VoiceResponseService:
             tts_time = time.perf_counter() - tts_start
             total_time = time.perf_counter() - total_start
             return {
+                "turn_id": effective_turn_id,
                 "transcript": "",
                 "response": response_text,
                 "audio_path": generated_audio_path,
@@ -713,6 +900,7 @@ class VoiceResponseService:
             tts_time = time.perf_counter() - tts_start
 
             return {
+                "turn_id": effective_turn_id,
                 "transcript": transcript,
                 "response": response_text,
                 "audio_path": generated_audio_path,
@@ -722,15 +910,12 @@ class VoiceResponseService:
                 "is_escalated": True,
             }
 
-        # g. Generate AI response using ResponseService with history and optional company knowledge
+        # g. Generate AI response using ResponseService with history and company knowledge
         llm_start = time.perf_counter()
-        system_instruction = None
-        knowledge_context = None
-        if company_id:
-            system_instruction = self.knowledge_service.get_system_instruction(company_id)
-            knowledge_context = self.knowledge_service.get_relevant_knowledge(
-                company_id, transcript, conversation_context=history_context
-            )
+        system_instruction = self.knowledge_service.get_system_instruction(effective_company_id)
+        knowledge_context = self.knowledge_service.get_relevant_knowledge(
+            effective_company_id, transcript, conversation_context=history_context
+        )
 
         response_text = await self.response_service.generate_response(
             transcript=transcript,
@@ -784,6 +969,7 @@ class VoiceResponseService:
         )
 
         return {
+            "turn_id": effective_turn_id,
             "transcript": transcript,
             "response": response_text,
             "audio_path": generated_audio_path,
