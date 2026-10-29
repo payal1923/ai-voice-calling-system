@@ -170,11 +170,13 @@ class VoiceResponseService:
             transcript, audio_duration = self.stt_service.transcribe_with_info(
                 effective_stt_path,
                 initial_prompt=stt_prompt,
+                company_id=effective_company_id,
             )
         else:
             transcript = self.stt_service.transcribe(
                 stt_audio_path,
                 initial_prompt=stt_prompt,
+                company_id=effective_company_id,
             )
             audio_duration = 0.0
         stt_time = time.perf_counter() - stt_start
@@ -292,6 +294,7 @@ class VoiceResponseService:
                     conversation_context=history_context,
                     system_instruction=system_instruction,
                     knowledge_context=knowledge_context,
+                    company_id=effective_company_id,
                 )
                 used_streaming = True
             except Exception as e:
@@ -305,6 +308,7 @@ class VoiceResponseService:
                 return_details=True,
                 system_instruction=system_instruction,
                 knowledge_context=knowledge_context,
+                company_id=effective_company_id,
             )
             if isinstance(llm_res, tuple):
                 response_text, llm_details = llm_res
@@ -432,7 +436,9 @@ class VoiceResponseService:
         transcript, audio_duration = await asyncio.to_thread(
             self.stt_service.transcribe_with_info,
             effective_stt_path,
-            initial_prompt=stt_prompt,
+            None,
+            stt_prompt,
+            effective_company_id,
         )
         stt_end_at = time.perf_counter()
         stt_time = stt_end_at - stt_start_at
@@ -623,6 +629,7 @@ class VoiceResponseService:
             conversation_context=history_context,
             system_instruction=system_instruction,
             knowledge_context=knowledge_context,
+            company_id=effective_company_id,
             timings=llm_timings,
         )
 
@@ -829,11 +836,13 @@ class VoiceResponseService:
             transcript, _ = self.stt_service.transcribe_with_info(
                 effective_stt_path,
                 initial_prompt=stt_prompt,
+                company_id=effective_company_id,
             )
         else:
             transcript = self.stt_service.transcribe(
                 stt_audio_path,
                 initial_prompt=stt_prompt,
+                company_id=effective_company_id,
             )
         stt_time = time.perf_counter() - stt_start
 
@@ -922,6 +931,7 @@ class VoiceResponseService:
             conversation_context=history_context,
             system_instruction=system_instruction,
             knowledge_context=knowledge_context,
+            company_id=effective_company_id,
         )
         llm_time = time.perf_counter() - llm_start
 

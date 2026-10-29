@@ -1,0 +1,207 @@
+{
+  "metadata": {
+    "company_id": "apex_car_rental",
+    "company_name": "Apex Wheels Car Rental",
+    "industry": "automotive_rental",
+    "brand": "Apex Mobility Solutions",
+    "description": "Premium airport and city self-drive and chauffeur car rental provider offering economy sedans, electric vehicles, and luxury SUVs."
+  },
+  "location": {
+    "address": "Counter 4B, Arrival Hall, Terminal 3, IGI Airport, New Delhi 110037, India",
+    "proximity": "Inside Terminal 3 arrival concourse with dedicated vehicle pickup lot at Multi-Level Car Parking (MLCP) Level 2.",
+    "city": "New Delhi",
+    "country": "India",
+    "timezone": "Asia/Kolkata"
+  },
+  "operating_hours": {
+    "is_24_7": true,
+    "special_notes": "Airport pickup and drop-off counter operates 24 hours daily. City delivery available from 6:00 AM to 10:00 PM."
+  },
+  "voice_and_language": {
+    "default_language": "en-US",
+    "supported_languages": [
+      "en-US",
+      "hi-IN"
+    ],
+    "tts_voice_id": "en_US-lessac-medium",
+    "speaking_rate": 1.05
+  },
+  "conversational_preferences": {
+    "greeting_message": "Hello, thank you for calling Apex Wheels Car Rental at Delhi Airport. How can I help with your vehicle rental today?",
+    "system_instruction": "You are the prompt, helpful, and professional AI voice assistant for Apex Wheels Car Rental. You assist customers with vehicle categories, rental rates, pickup locations, driver requirements, and fuel policies. Answer concisely in 1-2 spoken sentences based strictly on verified fleet facts.",
+    "fallback_message": "I apologize, I didn't quite catch that. Are you inquiring about vehicle availability, rental rates, or required documents?",
+    "clarification_message": "Could you please specify which vehicle category or rental duration you are interested in?",
+    "max_response_tokens": 100,
+    "temperature": 0.2
+  },
+  "speech_recognition": {
+    "stt_prompt": "Apex Wheels Car Rental customer inquiry: self-drive, SUV, sedan, electric vehicle, pickup location, drop-off, driver license, security deposit, full-to-full fuel policy, insurance waiver, unlimited mileage.",
+    "vocabulary_boost": [
+      "Apex",
+      "SUV",
+      "sedan",
+      "EV",
+      "self-drive",
+      "chauffeur",
+      "MLCP",
+      "waiver",
+      "deposit"
+    ],
+    "acoustic_normalization_rules": [
+      {
+        "rule_id": "car_rental_acoustic_mishearing",
+        "pattern": "\\b(?:card|cur|core)\\s+rental\\b",
+        "replacement": "car rental",
+        "description": "Acoustic distortion of car rental"
+      },
+      {
+        "rule_id": "suv_phonetic_expansion",
+        "pattern": "\\b(?:s\\s+u\\s+v|su\\s+v)\\b",
+        "replacement": "SUV",
+        "description": "Separated letter recognition for SUV"
+      },
+      {
+        "rule_id": "child_seat_phonetic_error",
+        "pattern": "\\bchild\\s+(?:sheet|suit)\\b",
+        "replacement": "child seat",
+        "description": "Phonetic distortion of child safety seat"
+      },
+      {
+        "rule_id": "full_to_full_fuel_correction",
+        "pattern": "\\b(?:fall|fool|fuel)\\s+to\\s+(?:fall|fool|fuel)\\b",
+        "replacement": "full-to-full fuel",
+        "description": "Phonetic variation of full-to-full fuel policy"
+      }
+    ]
+  },
+  "knowledge_base": {
+    "facts": [
+      {
+        "id": "fleet_overview",
+        "category": "vehicles",
+        "keywords": [
+          "car",
+          "cars",
+          "fleet",
+          "vehicles",
+          "options",
+          "suv",
+          "sedan",
+          "ev",
+          "models"
+        ],
+        "fact": "Apex Wheels offers three vehicle categories: Compact Economy (Maruti Swift and Hyundai i20), Executive Sedans (Honda City and Skoda Slavia), and Premium SUVs (Toyota Innova Crysta and Mahindra XUV700). All vehicles include air conditioning and GPS navigation.",
+        "priority": 10,
+        "followup_cues": [
+          "what cars do you have",
+          "what models",
+          "which suv"
+        ]
+      },
+      {
+        "id": "driver_requirements",
+        "category": "policies",
+        "keywords": [
+          "license",
+          "id",
+          "age",
+          "driver",
+          "requirement",
+          "documents",
+          "passport",
+          "international permit"
+        ],
+        "fact": "All primary drivers must be at least 21 years old and possess a valid original driving license held for at least one year. International travellers must present a valid passport and International Driving Permit (IDP).",
+        "priority": 9,
+        "followup_cues": [
+          "what documents do i need",
+          "how old do i have to be"
+        ]
+      },
+      {
+        "id": "fuel_policy",
+        "category": "policies",
+        "keywords": [
+          "fuel",
+          "petrol",
+          "diesel",
+          "gas",
+          "full to full",
+          "refuel",
+          "tank"
+        ],
+        "fact": "Our rentals operate on a transparent full-to-full fuel policy. You receive the vehicle with a full tank of fuel and must return it full to avoid refueling service surcharges.",
+        "priority": 8
+      },
+      {
+        "id": "pickup_dropoff_location",
+        "category": "location",
+        "keywords": [
+          "pickup",
+          "pick up",
+          "drop off",
+          "where to collect",
+          "airport counter",
+          "terminal 3",
+          "mlcp"
+        ],
+        "fact": "Airport vehicle pickups occur at Terminal 3 Multi-Level Car Parking (MLCP) Level 2, accessible via the covered skywalk directly from the arrival hall.",
+        "priority": 8
+      },
+      {
+        "id": "security_deposit_payment",
+        "category": "billing",
+        "keywords": [
+          "deposit",
+          "security deposit",
+          "payment",
+          "credit card",
+          "refund",
+          "hold"
+        ],
+        "fact": "A refundable security deposit of 5,000 to 10,000 rupees depending on vehicle category is pre-authorized on a credit card upon vehicle pickup and released within 48 hours of vehicle return inspection.",
+        "priority": 7
+      },
+      {
+        "id": "pet_policy",
+        "category": "policies",
+        "keywords": [
+          "pet",
+          "pets",
+          "dog",
+          "dogs",
+          "cat",
+          "cats",
+          "animal",
+          "animals"
+        ],
+        "fact": "Pets are permitted in rental vehicles provided they are transported in suitable carriers or crates. A deep-cleaning fee applies only if pet hair or excessive soiling requires professional detailing.",
+        "priority": 8
+      }
+    ]
+  },
+  "policies": {
+    "cancellation_policy": "Cancellations made more than 12 hours before scheduled pickup receive a full 100% refund. Cancellations within 12 hours incur a 1-day rental fee.",
+    "payment_methods": [
+      "Major Credit Cards (Visa, MasterCard, Amex)",
+      "Debit Cards",
+      "UPI for security deposits"
+    ],
+    "identification_requirements": "Valid Government Driving License and original Passport/Aadhaar card.",
+    "custom_policies": {
+      "mileage_policy": "All rentals include unlimited kilometers within the National Capital Region (NCR) and neighboring states.",
+      "smoking_policy": "All rental vehicles are strictly non-smoking. A deep-cleaning fee of 2,500 rupees applies if smoking occurs in the vehicle.",
+      "pet_policy": "Pets are permitted in rental vehicles provided they are transported in suitable carriers or crates."
+    }
+  },
+  "domain_extensions": {
+    "domain_module": "automotive_rental",
+    "deterministic_handlers_enabled": true,
+    "custom_parameters": {
+      "default_security_deposit_inr": 5000,
+      "unlimited_mileage": true,
+      "fuel_policy_type": "full_to_full"
+    }
+  }
+}
+

@@ -2,9 +2,11 @@ import os
 import json
 import re
 from typing import Dict, Any, List, Optional
+from app.knowledge.schema import BusinessProfile
 
 _KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge", "companies")
 _CACHE: Dict[str, Dict[str, Any]] = {}
+_PROFILE_CACHE: Dict[str, BusinessProfile] = {}
 
 
 class KnowledgeService:
@@ -12,17 +14,21 @@ class KnowledgeService:
     Lightweight, in-memory knowledge retrieval service for company-specific voice profiles.
     Loads approved facts and personas from JSON profiles, performing fast keyword-anchored
     fact retrieval to ground LLM voice responses without external vector databases or migrations.
+    Supports validated BusinessProfile schema with two-way legacy backward compatibility.
     """
 
     def __init__(self, knowledge_dir: str = _KNOWLEDGE_DIR):
         self.knowledge_dir = knowledge_dir
 
     def load_company_profile(self, company_id: str) -> Optional[Dict[str, Any]]:
-        """Loads and caches the company knowledge profile from disk."""
+        """Loads and caches the company knowledge profile from disk as a dict."""
         if not company_id:
             return None
 
         clean_id = str(company_id).strip().lower()
+        if not re.match(r"^[a-z0-9_-]+$", clean_id):
+            return None
+
         if clean_id in _CACHE:
             return _CACHE[clean_id]
 
@@ -33,11 +39,86 @@ class KnowledgeService:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+
+            # Two-way compatibility: ensure legacy flat keys exist if loaded from modern schema
+            if "metadata" in data and isinstance(data["metadata"], dict):
+                meta = data["metadata"]
+                if "company_id" not in data:
+                    data["company_id"] = meta.get("company_id")
+                if "company_name" not in data:
+                    data["company_name"] = meta.get("company_name")
+                if "brand" not in data:
+                    data["brand"] = meta.get("brand")
+            if "conversational_preferences" in data and isinstance(data["conversational_preferences"], dict):
+                prefs = data["conversational_preferences"]
+                if "greeting_message" not in data:
+                    data["greeting_message"] = prefs.get("greeting_message")
+                if "system_instruction" not in data:
+                    data["system_instruction"] = prefs.get("system_instruction")
+            if "speech_recognition" in data and isinstance(data["speech_recognition"], dict):
+                speech = data["speech_recognition"]
+                if "stt_prompt" not in data:
+                    data["stt_prompt"] = speech.get("stt_prompt")
+            if "knowledge_base" in data and isinstance(data["knowledge_base"], dict):
+                kb = data["knowledge_base"]
+                if "facts" not in data:
+                    data["facts"] = kb.get("facts", [])
+
             _CACHE[clean_id] = data
             return data
         except Exception as e:
             print(f"[KNOWLEDGE_SERVICE ERROR] Failed loading profile for '{clean_id}': {e}")
             return None
+
+    def load_profile(self, company_id: str) -> Optional[BusinessProfile]:
+        """Loads, validates, and caches the standardized BusinessProfile model."""
+        if not company_id:
+            return None
+
+        clean_id = str(company_id).strip().lower()
+        if not re.match(r"^[a-z0-9_-]+$", clean_id):
+            return None
+
+        if clean_id in _PROFILE_CACHE:
+            return _PROFILE_CACHE[clean_id]
+
+        raw_data = self.load_company_profile(clean_id)
+        if not raw_data:
+            return None
+
+        try:
+            profile = BusinessProfile.from_dict(raw_data)
+            _PROFILE_CACHE[clean_id] = profile
+            return profile
+        except Exception as e:
+            print(f"[KNOWLEDGE_SERVICE ERROR] Failed validating BusinessProfile for '{clean_id}': {e}")
+            return None
+
+    def get_acoustic_rules(self, company_id: Optional[str]) -> List[Any]:
+        """Returns the acoustic normalization rules for the given company profile."""
+        if not company_id:
+            return []
+        clean_id = str(company_id).strip().lower()
+        profile = self.load_profile(clean_id)
+        if profile and profile.speech_recognition:
+            return profile.speech_recognition.acoustic_normalization_rules or []
+        return []
+
+    def clear_cache(self, company_id: Optional[str] = None):
+        """Clears in-memory profile and raw dictionary caches."""
+        global _CACHE, _PROFILE_CACHE
+        if company_id:
+            clean_id = str(company_id).strip().lower()
+            _CACHE.pop(clean_id, None)
+            _PROFILE_CACHE.pop(clean_id, None)
+        else:
+            _CACHE.clear()
+            _PROFILE_CACHE.clear()
+
+    def reload_profile(self, company_id: str) -> Optional[BusinessProfile]:
+        """Evicts and reloads the profile for the given company from disk."""
+        self.clear_cache(company_id)
+        return self.load_profile(company_id)
 
     def get_system_instruction(self, company_id: str) -> Optional[str]:
         """Returns the system instruction / persona prompt for the company."""

@@ -220,6 +220,20 @@ class ResponseService:
         return cleaned.strip()
 
     @classmethod
+    def _is_hospitality_domain(cls, company_id: str = None) -> bool:
+        """Determines whether the given tenant belongs to the hospitality industry."""
+        cid = (company_id or "").strip().lower()
+        if not cid or cid == "pullman_aerocity":
+            return True
+        try:
+            from app.domains.hospitality import HospitalityDomain
+            from app.services.knowledge_service import KnowledgeService
+            profile = KnowledgeService().load_profile(cid)
+            return HospitalityDomain.is_hospitality(profile)
+        except Exception:
+            return False
+
+    @classmethod
     def _normalize_phonetic_input(cls, text: str) -> str:
         """
         Normalizes common acoustic and phonetic speech-to-text mistranscriptions.
@@ -260,6 +274,7 @@ class ResponseService:
         return_details: bool = False,
         system_instruction: str = None,
         knowledge_context: str = None,
+        company_id: str = "pullman_aerocity",
     ):
         """
         Produces a concise, natural-language assistant reply for the customer's
@@ -270,6 +285,9 @@ class ResponseService:
             res = "I'm sorry, I didn't catch that. Could you please repeat your request?"
             return (res, {}) if return_details else res
 
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
+        is_hospitality = self._is_hospitality_domain(effective_company_id)
+
         # 0. Relevance safeguard: sanitize knowledge_context against spurious fact cross-contamination
         knowledge_context = self._filter_relevant_knowledge(transcript, knowledge_context, conversation_context)
 
@@ -277,6 +295,60 @@ class ResponseService:
         statement_resp = self._get_conversational_statement_response(transcript, conversation_context)
         if statement_resp:
             return (statement_resp, {}) if return_details else statement_resp
+
+        # Domain routing for non-hospitality tenants
+        if not is_hospitality:
+            from app.domains.registry import DomainRegistry
+            auto_domain = DomainRegistry.get("automotive_rental")
+            if auto_domain and hasattr(auto_domain, "get_fast_path_response"):
+                auto_resp = auto_domain.get_fast_path_response(transcript, knowledge_context)
+                if auto_resp:
+                    return (auto_resp, {}) if return_details else auto_resp
+
+            repetition_resp = self._get_repetition_response(transcript, conversation_context)
+            if repetition_resp:
+                return (repetition_resp, {}) if return_details else repetition_resp
+
+            closing_resp = self._get_closing_response(transcript)
+            if closing_resp:
+                return (closing_resp, {}) if return_details else closing_resp
+
+            audio_check_resp = self._get_audio_check_response(transcript)
+            if audio_check_resp:
+                return (audio_check_resp, {}) if return_details else audio_check_resp
+
+            identity_resp = self._get_identity_response(transcript)
+            if identity_resp:
+                return (identity_resp, {}) if return_details else identity_resp
+
+            if self._is_unclear_or_garbled_transcript(transcript, knowledge_context, conversation_context):
+                res = self._get_clarification_response(transcript, conversation_context)
+                return (res, {}) if return_details else res
+
+            prompt = self._build_prompt(
+                transcript,
+                conversation_context=conversation_context,
+                system_instruction=system_instruction,
+                knowledge_context=knowledge_context,
+            )
+            llm_details = {}
+            try:
+                llm_res = await self._call_llm(prompt, num_predict=90, return_details=return_details)
+                if return_details and isinstance(llm_res, tuple):
+                    raw, llm_details = llm_res
+                else:
+                    raw = llm_res
+            except Exception as e:
+                print(f"Warning: LLM response generation failed: {e}")
+                raw = FALLBACK_RESPONSE
+
+            cleaned = self._clean_text(raw)
+            if not cleaned:
+                cleaned = FALLBACK_RESPONSE
+
+            if return_details:
+                return cleaned, llm_details
+            return cleaned
 
         # 0b. Clarification answer handler: customer confirming vegetarian options in response to clarification
         clarif_answer_resp = self._get_clarification_answer_response(transcript, conversation_context)
@@ -3544,6 +3616,93 @@ class ResponseService:
                 yield s
             return
 
+        is_hospitality = self._is_hospitality_domain(effective_company_id)
+        if not is_hospitality:
+            from app.domains.registry import DomainRegistry
+            auto_domain = DomainRegistry.get("automotive_rental")
+            if auto_domain and hasattr(auto_domain, "get_fast_path_response"):
+                auto_resp = auto_domain.get_fast_path_response(transcript, knowledge_context)
+                if auto_resp:
+                    for s in self.split_into_sentences(auto_resp):
+                        yield s
+                    return
+
+            repetition_resp = self._get_repetition_response(transcript, conversation_context)
+            if repetition_resp:
+                yield repetition_resp
+                return
+
+            closing_resp = self._get_closing_response(transcript)
+            if closing_resp:
+                for s in self.split_into_sentences(closing_resp):
+                    yield s
+                return
+
+            audio_check_resp = self._get_audio_check_response(transcript)
+            if audio_check_resp:
+                for s in self.split_into_sentences(audio_check_resp):
+                    yield s
+                return
+
+            identity_resp = self._get_identity_response(transcript)
+            if identity_resp:
+                for s in self.split_into_sentences(identity_resp):
+                    yield s
+                return
+
+            if self._is_unclear_or_garbled_transcript(transcript, knowledge_context, conversation_context):
+                clarif = self._get_clarification_response(transcript, conversation_context)
+                for s in self.split_into_sentences(clarif):
+                    yield s
+                return
+
+            # Non-hospitality domain LLM streaming directly
+            prompt = self._build_prompt(
+                transcript,
+                conversation_context=conversation_context,
+                system_instruction=system_instruction,
+                knowledge_context=knowledge_context,
+            )
+            buffer = ""
+            yielded_count = 0
+            yielded_sentences = set()
+            t_llm_call_start = time.perf_counter()
+            if timings is not None:
+                timings["llm_start"] = t_llm_call_start
+            try:
+                async with aclosing(generate_response_stream(prompt, num_predict=120, timings=timings)) as stream:
+                    async for token in stream:
+                        buffer += token
+                        sentence, buffer = self._extract_next_sentence(buffer, is_stream_end=False)
+                        if sentence:
+                            s_norm = re.sub(r"[^\w\s]", "", (sentence or "").lower()).strip()
+                            if sentence and s_norm and s_norm not in yielded_sentences:
+                                if yielded_count == 0 and timings is not None:
+                                    timings["llm_ttfs"] = time.perf_counter() - t_llm_call_start
+                                yielded_sentences.add(s_norm)
+                                yielded_count += 1
+                                yield sentence
+            except Exception as e:
+                print(f"[STREAMING ERROR] Ollama token stream exception: {e}")
+
+            if buffer.strip():
+                sentence, _ = self._extract_next_sentence(buffer, is_stream_end=True)
+                if sentence:
+                    s_norm = re.sub(r"[^\w\s]", "", (sentence or "").lower()).strip()
+                    if sentence and s_norm and s_norm not in yielded_sentences:
+                        if yielded_count == 0 and timings is not None:
+                            timings["llm_ttfs"] = time.perf_counter() - t_llm_call_start
+                        yielded_sentences.add(s_norm)
+                        yielded_count += 1
+                        yield sentence
+
+            if timings is not None and "llm_total" not in timings:
+                timings["llm_total"] = time.perf_counter() - t_llm_call_start
+
+            if yielded_count == 0:
+                yield FALLBACK_RESPONSE
+            return
+
         # 0b. Clarification answer handler
         clarif_answer_resp = self._get_clarification_answer_response(transcript, conversation_context)
         if clarif_answer_resp:
@@ -3865,6 +4024,7 @@ class ResponseService:
         conversation_context: str = "",
         system_instruction: str = None,
         knowledge_context: str = None,
+        company_id: str = "pullman_aerocity",
     ):
         """
         Streams tokens from Ollama and RETURNS AS SOON AS the first complete
@@ -3894,6 +4054,9 @@ class ResponseService:
             res = "I'm sorry, I didn't catch that. Could you please repeat your request?"
             return res, fast_timings
 
+        effective_company_id = (company_id or "").strip().lower() or "pullman_aerocity"
+        is_hospitality = self._is_hospitality_domain(effective_company_id)
+
         # 0. Relevance safeguard: sanitize knowledge_context against spurious fact cross-contamination
         knowledge_context = self._filter_relevant_knowledge(transcript, knowledge_context, conversation_context)
 
@@ -3916,6 +4079,62 @@ class ResponseService:
         identity_resp = self._get_identity_response(transcript)
         if identity_resp:
             return identity_resp, fast_timings
+
+        if not is_hospitality:
+            from app.domains.registry import DomainRegistry
+            auto_domain = DomainRegistry.get("automotive_rental")
+            if auto_domain and hasattr(auto_domain, "get_fast_path_response"):
+                auto_resp = auto_domain.get_fast_path_response(transcript, knowledge_context)
+                if auto_resp:
+                    return auto_resp, fast_timings
+
+            if self._is_unclear_or_garbled_transcript(transcript, knowledge_context, conversation_context):
+                res = self._get_clarification_response(transcript, conversation_context)
+                return res, fast_timings
+
+            prompt = self._build_prompt(
+                transcript,
+                conversation_context=conversation_context,
+                system_instruction=system_instruction,
+                knowledge_context=knowledge_context,
+            )
+
+            t0 = time.perf_counter()
+            ttft = None
+            ttfs = None
+            tokens_accumulated = ""
+            first_sentence = ""
+            chunk_count = 0
+
+            try:
+                async with aclosing(generate_response_stream(prompt, num_predict=90)) as stream:
+                    async for token in stream:
+                        now = time.perf_counter()
+                        chunk_count += 1
+                        if ttft is None:
+                            ttft = now - t0
+
+                        tokens_accumulated += token
+
+                        if not first_sentence:
+                            candidate = self._first_sentence(tokens_accumulated)
+                            if candidate:
+                                first_sentence = self._clean_text(candidate)
+                                ttfs = now - t0
+                                if first_sentence:
+                                    break
+                if not first_sentence:
+                    first_sentence = self._clean_text(tokens_accumulated)
+            except Exception as e:
+                print(f"Warning: Streaming response generation failed: {e}")
+                first_sentence = FALLBACK_RESPONSE
+
+            fast_timings["llm_ttft_sec"] = ttft if ttft is not None else 0.0
+            fast_timings["llm_sentence_sec"] = ttfs if ttfs is not None else 0.0
+            fast_timings["llm_return_sec"] = time.perf_counter() - t0
+            fast_timings["chunk_count"] = chunk_count
+
+            return first_sentence or FALLBACK_RESPONSE, fast_timings
 
         # 0g2. General cross-domain multi-intent compound response handler
         compound_resp = self._get_compound_knowledge_response(transcript, knowledge_context, conversation_context)

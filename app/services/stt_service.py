@@ -34,10 +34,10 @@ TELECOM_DOMAIN_PROMPT = (
 )
 
 
-def normalize_acoustic_phonetic_errors(text: str) -> str:
+def _apply_pullman_acoustic_rules(text: str) -> str:
     """
-    Normalizes common acoustic and phonetic mistranscriptions from microphone audio,
-    especially where initial consonants or accents are softened by VAD or compression.
+    Applies verified acoustic and phonetic mistranscription rules specific to
+    Pullman New Delhi Aerocity hospitality queries (towels, check-in, Wi-Fi, pool).
     """
     if not text:
         return text
@@ -114,6 +114,55 @@ def normalize_acoustic_phonetic_errors(text: str) -> str:
     return norm
 
 
+def normalize_acoustic_phonetic_errors(
+    text: str,
+    company_id: str = "pullman_aerocity",
+    acoustic_rules: list = None,
+) -> str:
+    """
+    Context-aware acoustic and phonetic error normalizer:
+    1. If custom acoustic_rules are supplied, applies those declarative rules.
+    2. If company_id is 'pullman_aerocity' (default for backward compatibility), applies
+       the 17 verified Pullman hospitality phonetic corrections.
+    3. If company_id is a different registered business, queries KnowledgeService for
+       that tenant's specific acoustic rules, avoiding cross-industry rule contamination.
+    """
+    if not text:
+        return text
+
+    # Explicit rules override
+    if acoustic_rules:
+        for rule in acoustic_rules:
+            pat = getattr(rule, "pattern", None) or (rule.get("pattern") if isinstance(rule, dict) else None)
+            rep = getattr(rule, "replacement", None) or (rule.get("replacement") if isinstance(rule, dict) else None)
+            if pat and rep:
+                flags = 0 if getattr(rule, "case_sensitive", False) else re.IGNORECASE
+                text = re.sub(pat, rep, text, flags=flags)
+        return text
+
+    clean_id = (company_id or "").strip().lower()
+
+    # Pullman Aerocity baseline reference
+    if clean_id == "pullman_aerocity":
+        return _apply_pullman_acoustic_rules(text)
+
+    # Dynamic tenant lookup for other businesses (e.g. apex_car_rental)
+    if clean_id:
+        try:
+            from app.services.knowledge_service import KnowledgeService
+            rules = KnowledgeService().get_acoustic_rules(clean_id)
+            for rule in rules:
+                pat = getattr(rule, "pattern", None)
+                rep = getattr(rule, "replacement", None)
+                if pat and rep:
+                    flags = 0 if getattr(rule, "case_sensitive", False) else re.IGNORECASE
+                    text = re.sub(pat, rep, text, flags=flags)
+        except Exception as e:
+            print(f"[STT NORMALIZATION WARNING] Failed applying acoustic rules for '{clean_id}': {e}")
+
+    return text
+
+
 
 class STTService:
     """
@@ -177,6 +226,8 @@ class STTService:
         audio_path: str,
         language: str = None,
         initial_prompt: str = None,
+        company_id: str = "pullman_aerocity",
+        acoustic_rules: list = None,
     ) -> tuple[str, float]:
         """
         Transcribes an audio file to text using Faster-Whisper with Silero VAD filtering
@@ -265,7 +316,7 @@ class STTService:
                     segments[0].text = orig_text[len(w_str):].lstrip(" ,")
 
         text = " ".join(segment.text.strip() for segment in segments if segment.text).strip()
-        text = normalize_acoustic_phonetic_errors(text)
+        text = normalize_acoustic_phonetic_errors(text, company_id=company_id, acoustic_rules=acoustic_rules)
 
         # If voice detection finds no speech, safely retain empty transcript without forcing hallucination
         if not text:
@@ -300,6 +351,8 @@ class STTService:
         audio_path: str,
         language: str = None,
         initial_prompt: str = None,
+        company_id: str = "pullman_aerocity",
+        acoustic_rules: list = None,
     ) -> dict:
         """
         Transcribes audio and returns full confidence metrics alongside text and duration.
@@ -376,7 +429,7 @@ class STTService:
                     valid_segments[0].text = orig_text[len(w_str):].lstrip(" ,")
 
         text = " ".join(s.text.strip() for s in valid_segments if s.text).strip()
-        text = normalize_acoustic_phonetic_errors(text)
+        text = normalize_acoustic_phonetic_errors(text, company_id=company_id, acoustic_rules=acoustic_rules)
         audio_dur = float(info.duration) if info and hasattr(info, "duration") else 0.0
 
         if valid_segments:
@@ -405,6 +458,8 @@ class STTService:
         audio_path: str,
         language: str = None,
         initial_prompt: str = None,
+        company_id: str = "pullman_aerocity",
+        acoustic_rules: list = None,
     ) -> str:
         """
         Transcribes an audio file to text using Faster-Whisper.
@@ -414,6 +469,8 @@ class STTService:
             audio_path=audio_path,
             language=language,
             initial_prompt=initial_prompt,
+            company_id=company_id,
+            acoustic_rules=acoustic_rules,
         )
         return text
 
